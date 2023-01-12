@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33103.184
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "dotnet-reactjs", "dotnet-reactjs.csproj", "{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Debug|x86.ActiveCfg = Debug|x86
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Debug|x86.Build.0 = Debug|x86
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Release|Any CPU.Build.0 = Release|Any CPU
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Release|x86.ActiveCfg = Release|x86
+		{68AFE79A-FBC4-4BF7-AA2B-7CA2D9782394}.Release|x86.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7F3D50BA-85C2-4CCF-8647-F8920798A06E}
+	EndGlobalSection
+EndGlobal
