@@ -15,7 +15,6 @@ function Home() {
         if (!graphJson) {
             return []
         }
-
         const graph = JSON.parse(graphJson);
 
         var entityCount = graph.Entities.length;
@@ -32,7 +31,6 @@ function Home() {
             elements.push({ 'data': { 'source': graph.Edges[i][0], 'target': graph.Edges[i][1] }, 'classes': 'edge' });
         }
 
-        //alert(JSON.stringify(elements))
         return elements;
     }
 

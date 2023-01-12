@@ -6,32 +6,20 @@ namespace dotnet_reactjs.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class WeatherForecastController : ControllerBase
+public class NetworkAnalyzerController : ControllerBase
 {
     private static readonly string[] Summaries = new[]
     {
         "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
     };
 
-    private readonly ILogger<WeatherForecastController> _logger;
+    private readonly ILogger<NetworkAnalyzerController> _logger;
 
     private static readonly string PcapUploadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "PcapUpload");
 
-    public WeatherForecastController(ILogger<WeatherForecastController> logger)
+    public NetworkAnalyzerController(ILogger<NetworkAnalyzerController> logger)
     {
         _logger = logger;
-    }
-
-    [HttpGet]
-    public IEnumerable<WeatherForecast> Get()
-    {
-        return Enumerable.Range(1, 5).Select(index => new WeatherForecast
-        {
-            Date = DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
-        })
-        .ToArray();
     }
 
     [HttpPost]
@@ -59,11 +47,12 @@ public class WeatherForecastController : ControllerBase
             }
 
             PcapAnalyzer pcapAnalyzer = new PcapAnalyzer(filePath);
-            string graphJson = await pcapAnalyzer.Analyze();
+            string graphJson = await pcapAnalyzer.GenerateCytoscapeGraphJson();
 
             // Delete file
             try
             {
+                // Don't delete for now so that it's saved for next use (save precious SSD write cycles)
                 //System.IO.File.Delete(filePath);
             }
             catch

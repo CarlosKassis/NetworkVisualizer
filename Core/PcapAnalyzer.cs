@@ -9,6 +9,7 @@ namespace dotnet_reactjs.Core
     using System.Collections.Concurrent;
     using dotnet_reactjs.Utils;
     using System.Collections.Generic;
+    using System.Runtime.CompilerServices;
 
     class EntityData
     {
@@ -31,7 +32,7 @@ namespace dotnet_reactjs.Core
             _filePath = filePath;
         }
 
-        public async Task<string> Analyze()
+        public async Task<string> GenerateCytoscapeGraphJson()
         {
             // Optimization: add BPF filters
             OfflinePacketDevice selectedDevice = new OfflinePacketDevice(_filePath);
@@ -46,14 +47,13 @@ namespace dotnet_reactjs.Core
             }
 
             // Process in parallel
-            var packets = _packets.ToArray();
-            int chunkSize = packets.Length / ThreadCount + 1;
-            await Task.WhenAll(Enumerable.Range(0, ThreadCount).Select(i =>
-            {
-                return Task.Run(() => ProcessPackets(packets, i * chunkSize, chunkSize));
-            }));
+            await AnalyzeAggregatedPacketsInParallel(ThreadCount);
 
+            return GenerateCytoscapeGraphJsonFromAnalysis();
+        }
 
+        private string GenerateCytoscapeGraphJsonFromAnalysis()
+        {
             var edges = _interactions.Distinct().Select(interaction => new UndirectedEdge<string>(interaction.Item1, interaction.Item2)).ToList();
 
             var networkGraph = new UndirectedGraph<string, UndirectedEdge<string>>();
@@ -76,7 +76,17 @@ namespace dotnet_reactjs.Core
             _packets.Add(packet);
         }
 
-        private void ProcessPackets(Packet[] packets, int start, int count)
+        private async Task AnalyzeAggregatedPacketsInParallel(int threadCount)
+        {
+            var packets = _packets.ToArray();
+            int chunkSize = packets.Length / threadCount + 1;
+            await Task.WhenAll(Enumerable.Range(0, threadCount).Select(i =>
+            {
+                return Task.Run(() => AnalyzePackets(packets, i * chunkSize, chunkSize));
+            }));
+        }
+
+        private void AnalyzePackets(Packet[] packets, int start, int count)
         {
             int end = start + count;
             for (int i = start; i < end; i++)
@@ -86,11 +96,11 @@ namespace dotnet_reactjs.Core
                     break;
                 }
 
-                ProcessPacket(packets[i]);
+                AnalyzePacket(packets[i]);
             }
         }
 
-        private void ProcessPacket(Packet packet)
+        private void AnalyzePacket(Packet packet)
         {
             TryExtractEntities(packet);
             TryExtractInteraction(packet);

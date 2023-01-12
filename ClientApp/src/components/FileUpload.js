@@ -17,7 +17,7 @@ function FileUploadSingle(props) {
             formData.append('file', uploadedfile);
 
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'weatherforecast');
+            xhr.open('POST', 'networkanalyzer');
 
             xhr.onload = () => {
                 props.onCallback(xhr.responseText)
