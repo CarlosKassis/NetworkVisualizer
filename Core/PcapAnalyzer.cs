@@ -15,6 +15,8 @@ namespace dotnet_reactjs.Core
         public string? Hostname;
         public readonly HashSet<string> Services = new HashSet<string>();
         public string? Os;
+        public string? Domain;
+        public string? Mac;
     }
 
     public class PcapAnalyzer
@@ -278,6 +280,11 @@ namespace dotnet_reactjs.Core
 
         private void TryExtractDeviceProvidedService(Packet packet)
         {
+            if (!packet.HasIpLayer())
+            {
+                return;
+            }
+
             if (!packet.IsTcp() && !packet.IsUdp())
             {
                 return;

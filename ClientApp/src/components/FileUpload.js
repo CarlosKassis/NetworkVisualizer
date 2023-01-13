@@ -20,7 +20,7 @@ function FileUploadSingle(props) {
             xhr.open('POST', 'networkanalyzer');
 
             xhr.onload = () => {
-                props.onCallback(xhr.responseText)
+                 props.onCallback(xhr.responseText)
             };
 
             xhr.send(formData);

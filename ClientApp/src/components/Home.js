@@ -1,13 +1,32 @@
 import React, { useState } from 'react';
 import FileUploadSingle from './FileUpload'
 import CytoscapeWrapper from './CytoscapeWrapper'
+import EntityInfo from './EntityInfo';
 
 function Home() {
 
     const [graphElements, setGraphElements] = useState([]);
 
+    const [ip, setIp] = useState(null);
+    const [os, setOs] = useState(null);
+    const [mac, setMac] = useState(null);
+    const [hostname, setHostname] = useState(null);
+    const [domain, setDomain] = useState(null);
+
     const fileUploadCallback = (json) => {
         setGraphElements(generateGraphElements(json));
+    }
+
+    const writeEntityDataToEntityInfo = (node) =>
+    {
+        alert("aaaa");
+        /*this.setState({
+            ip: entityData.Ip,
+            hostname: entityData.Hostname,
+            mac: entityData.Mac,
+            os: entityData.Os,
+            domain: entityData.Domain
+        });*/
     }
 
     const serviceNamesThatMakeYouAServer = ["HTTP", "HTTPS", "DNS", "DHCP"]
@@ -74,8 +93,11 @@ function Home() {
         <h1>Traffic Analysis</h1>
         <br/>
             <FileUploadSingle onCallback={fileUploadCallback} />
-        <br/>
-            <CytoscapeWrapper graphElements={graphElements} />
+            <br />
+            <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 30px 0 rgb(0 0 0 /60%)' }}>
+                <CytoscapeWrapper graphElements={graphElements} />
+                <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
+            </div>
         </div>
     );
 }
