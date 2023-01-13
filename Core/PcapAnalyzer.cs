@@ -58,6 +58,9 @@ namespace dotnet_reactjs.Core
             { 161, "SNMP" }
         };
 
+        private static readonly (int TerminateIndex, char TerminateChar)[] WindowsAfterVersionTerminators = new (int TerminateIndex, char TerminateChar)[] { (3, ')'), (3, ';'), (4, ')'), (4, ';') };
+        private static readonly List<string> OsNamesThatCanBeInHttpUserAgent = new List<string> { "Ubuntu", "Linux", "Mac" }; // Putting Linux flavors before "Linux" is important to detect flavor
+
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, EntityData> _entities = new ConcurrentDictionary<string, EntityData>();
@@ -177,7 +180,6 @@ namespace dotnet_reactjs.Core
                 _entities[packet.Ethernet.IpV4.Source.ToString()].Os = osName;
             }
         }
-
         private bool TryGetOsNameFromUserAgent(string userAgent, out string? osName)
         {
             if (TryGetWindowsOsNameFromUserAgent(userAgent, out osName))
@@ -185,12 +187,8 @@ namespace dotnet_reactjs.Core
                 return true;
             }
 
-            if (userAgent.Contains("Windows"))
-            {
-                // TODO: change to log instead of console write
-                Console.WriteLine($"Didn't detect Windows in userAgent: {userAgent}");
-            }
-            return false;
+            osName = OsNamesThatCanBeInHttpUserAgent.FirstOrDefault(possibleOsName => userAgent.Contains(possibleOsName));
+            return osName != null;
         }
 
         private bool TryGetWindowsOsNameFromUserAgent(string userAgent, out string? osName)
@@ -201,18 +199,16 @@ namespace dotnet_reactjs.Core
 
             if (windowsNTIndex < 0)
             {
+                if (userAgent.Contains("Windows"))
+                {
+                    osName = "Windows";
+                }
+
                 return false;
             }
 
-            int versionStartIndex = windowsNTIndex + windowsIdentifier.Length;
-            if (userAgent[versionStartIndex] == ';')
-            {
-                osName = "Windows";
-                return true;
-            }
-
-            string versionUntilEnd = userAgent.Substring(versionStartIndex);
-            var pair = new List<(int TerminateIndex, char TerminateChar)> { (3, ')'), (3, ';'), (4, ')'), (4, ';') }.FirstOrDefault(pair =>
+            string versionUntilEnd = userAgent.Substring(windowsNTIndex + windowsIdentifier.Length);
+            var pair = WindowsAfterVersionTerminators.FirstOrDefault(pair =>
             {
                 if (pair.TerminateIndex >= versionUntilEnd.Length)
                 {
@@ -317,3 +313,4 @@ namespace dotnet_reactjs.Core
         }
     }
 }
+

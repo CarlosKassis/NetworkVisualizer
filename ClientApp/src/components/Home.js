@@ -34,7 +34,6 @@ function Home() {
             for (const service of entityData.Services)
             {
                 if (service == "SNMP") {
-                    x = -100;
                     icon = '/iot.png'
                     break;
                 }
