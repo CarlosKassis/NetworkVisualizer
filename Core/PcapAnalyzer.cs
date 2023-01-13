@@ -9,12 +9,12 @@ namespace dotnet_reactjs.Core
     using System.Collections.Concurrent;
     using dotnet_reactjs.Utils;
     using System.Collections.Generic;
-    using System.Runtime.CompilerServices;
 
     class EntityData
     {
         public string? Hostname;
         public readonly HashSet<string> Services = new HashSet<string>();
+        public string? Os;
     }
 
     public class PcapAnalyzer
@@ -37,6 +37,17 @@ namespace dotnet_reactjs.Core
             { 443, "HTTPS" },
             { 465, "AuthSNMP" },
             { 636, "LDAPS" }
+        };
+
+        private static readonly Dictionary<string, string> WindowsVersionToName = new Dictionary<string, string>
+        {
+            { "5.1", "Windows XP" },
+            { "5.2", "Windows XP" },
+            { "6.0", "Windows Vista" },
+            { "6.1", "Windows 7" },
+            { "6.2", "Windows 8" },
+            { "6.3", "Windows 8.1" },
+            { "10.0", "Windows 10" }
         };
 
         private static readonly Dictionary<ushort, string> UdpPortToServiceName = new Dictionary<ushort, string>()
@@ -134,6 +145,49 @@ namespace dotnet_reactjs.Core
 
             TryExtractInteraction(packet);
             TryExtractDeviceProvidedService(packet);
+            TryExtractOs(packet);
+        }
+
+        private void TryExtractOs(Packet packet)
+        {
+            if (!packet.HasIpLayer())
+            {
+                return;
+            }
+
+            if (!(packet?.Ethernet?.IpV4?.Tcp?.Http?.IsValid ?? false))
+            {
+                return;
+            }
+
+            var http = packet.Ethernet.IpV4.Tcp.Http;
+            if (!http.IsRequest)
+            {
+                return;
+            }
+
+            string? userAgent = http?.Header?.FirstOrDefault(field => field.Name == "User-Agent" && field.ValueString.Contains("Windows"))?.ValueString;
+            if (userAgent == null)
+            {
+                return;
+            }
+            string windowsIdentifier = "Windows NT ";
+            int versionStartIndex = userAgent.IndexOf(windowsIdentifier) + windowsIdentifier.Length;
+            int versionEndIndex = userAgent.IndexOf(';', versionStartIndex);
+            string versionString = userAgent.Substring(versionStartIndex, 3);
+
+            if (!Version.TryParse(versionString, out var _))
+            {
+                return;
+                //throw new Exception($"Couldn't resolve Windows version string: '{versionString}'");
+            }
+
+            if (!WindowsVersionToName.TryGetValue(versionString, out string osName))
+            {
+                throw new Exception($"Couldn't match Windows version string to a Windows name: '{versionString}'");
+            }
+
+            _entities[packet.Ethernet.IpV4.Source.ToString()].Os = osName;
         }
 
         private void TryExtractEntity(Packet packet)
