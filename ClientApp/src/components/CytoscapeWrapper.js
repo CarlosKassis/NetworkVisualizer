@@ -23,7 +23,7 @@ function CytoscapeWrapper(props) {
                 {
                     selector: 'edge',
                     style: {
-                        'width': '2px',
+                        'width': '1.5px',
                         'line-color': '#999'
                     }
                 }

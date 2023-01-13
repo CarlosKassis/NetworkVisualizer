@@ -13,17 +13,44 @@ namespace dotnet_reactjs.Core
 
     class EntityData
     {
-        public string Hostname;
+        public string? Hostname;
+        public readonly HashSet<string> Services = new HashSet<string>();
     }
 
     public class PcapAnalyzer
     {
         private const int ThreadCount = 12;
+        private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
+        {
+            { 20, "FTP" },
+            { 21, "FTP" },
+            { 22, "SSH" },
+            { 23, "TELNET" },
+            { 25, "SMTP" },
+            { 80, "HTTP" },
+            { 79, "Finger" },
+            { 88, "Kerberos" },
+            { 115, "SFTP" },
+            { 137, "NetBIOS" },
+            { 264, "BGMP" },
+            { 389, "LDAP" },
+            { 443, "HTTPS" },
+            { 465, "AuthSNMP" },
+            { 636, "LDAPS" }
+        };
+
+        private static readonly Dictionary<ushort, string> UdpPortToServiceName = new Dictionary<ushort, string>()
+        {
+            { 53, "DNS" },
+            { 67, "DHCP" },
+            { 264, "BGMP" },
+            { 161, "SNMP" }
+        };
 
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, EntityData> _entities = new ConcurrentDictionary<string, EntityData>();
-        private readonly ConcurrentBag<(string, string)> _interactions = new ConcurrentBag<(string, string)>();
+        private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string _filePath;
 
@@ -54,7 +81,7 @@ namespace dotnet_reactjs.Core
 
         private string GenerateCytoscapeGraphJsonFromAnalysis()
         {
-            var edges = _interactions.Distinct().Select(interaction => new UndirectedEdge<string>(interaction.Item1, interaction.Item2)).ToList();
+            var edges = _interactions.Select(interaction => new UndirectedEdge<string>(interaction.Key.Item1, interaction.Key.Item2)).ToList();
 
             var networkGraph = new UndirectedGraph<string, UndirectedEdge<string>>();
             networkGraph.AddVerticesAndEdgeRange(edges);
@@ -62,7 +89,7 @@ namespace dotnet_reactjs.Core
             // Generate graph JSON
             var graphClass = new
             {
-                Entities = networkGraph.Vertices.OrderBy(vertex => vertex),
+                Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
                 Edges = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target })
             };
 
@@ -102,11 +129,14 @@ namespace dotnet_reactjs.Core
 
         private void AnalyzePacket(Packet packet)
         {
-            TryExtractEntities(packet);
+            // Make sure this is at start to first add source Ip if present
+            TryExtractEntity(packet);
+
             TryExtractInteraction(packet);
+            TryExtractDeviceProvidedService(packet);
         }
 
-        private void TryExtractEntities(Packet packet)
+        private void TryExtractEntity(Packet packet)
         {
             if (!packet.HasIpLayer())
             {
@@ -134,8 +164,50 @@ namespace dotnet_reactjs.Core
             var sourceIp = packet.Ethernet.IpV4.Source.ToString();
             var destIp = packet.Ethernet.IpV4.Destination.ToString();
 
+            if (Packets.IsMiscIp(sourceIp) || Packets.IsMiscIp(destIp))
+            {
+                return;
+            }
+
             // Compare to avoid adding same edge twice
-            _interactions.Add(sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp));
+            // Dicationary is used to do atomic [check if present] + [add]
+            _interactions[sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp)] = 0;
+        }
+
+        private void TryExtractDeviceProvidedService(Packet packet)
+        {
+            if (!packet.IsTcp() && !packet.IsUdp())
+            {
+                return;
+            }
+
+            // TODO: find better criteria? (some service ports may be above 1023)
+            if (packet.Ethernet.IpV4.Tcp.SourcePort > 1024)
+            {
+                return;
+            }
+
+            if (packet.IsTcp())
+            {
+                if (!packet.Ethernet.IpV4.Tcp.IsAcknowledgment)
+                {
+                    return;
+                }
+
+                ushort port = packet.Ethernet.IpV4.Tcp.SourcePort;
+                if (TcpPortToServiceName.ContainsKey(port))
+                {
+                    _entities[packet.Ethernet.IpV4.Source.ToString()].Services.Add(TcpPortToServiceName[port]);
+                }
+            }
+            else
+            {
+                ushort port = packet.Ethernet.IpV4.Udp.SourcePort;
+                if (UdpPortToServiceName.ContainsKey(port))
+                {
+                    _entities[packet.Ethernet.IpV4.Source.ToString()].Services.Add(UdpPortToServiceName[port]);
+                }
+            }
         }
     }
 }

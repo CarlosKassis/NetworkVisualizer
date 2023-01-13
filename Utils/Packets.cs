@@ -11,6 +11,16 @@ namespace dotnet_reactjs.Utils
             return packet?.Ethernet?.IpV4?.IsValid ?? false;
         }
 
+        public static bool IsUdp(this Packet? packet)
+        {
+            return packet?.Ethernet?.IpV4?.Udp?.IsValid ?? false;
+        }
+
+        public static bool IsTcp(this Packet? packet)
+        {
+            return packet?.Ethernet?.IpV4?.Tcp?.IsValid ?? false;
+        }
+
         public static bool IsMiscIp(string ip)
         {
             if (MiscIps.Contains(ip))
