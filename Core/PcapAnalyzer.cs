@@ -19,7 +19,7 @@ namespace dotnet_reactjs.Core
 
     public class PcapAnalyzer
     {
-        private const int ThreadCount = 12;
+        private const int ThreadCount = 10;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
         {
             { 20, "FTP" },
@@ -145,10 +145,10 @@ namespace dotnet_reactjs.Core
 
             TryExtractInteraction(packet);
             TryExtractDeviceProvidedService(packet);
-            TryExtractOs(packet);
+            TryExtractOsFromHttp(packet);
         }
 
-        private void TryExtractOs(Packet packet)
+        private void TryExtractOsFromHttp(Packet packet)
         {
             if (!packet.HasIpLayer())
             {
@@ -171,23 +171,75 @@ namespace dotnet_reactjs.Core
             {
                 return;
             }
-            string windowsIdentifier = "Windows NT ";
-            int versionStartIndex = userAgent.IndexOf(windowsIdentifier) + windowsIdentifier.Length;
-            int versionEndIndex = userAgent.IndexOf(';', versionStartIndex);
-            string versionString = userAgent.Substring(versionStartIndex, 3);
 
-            if (!Version.TryParse(versionString, out var _))
+            if (TryGetOsNameFromUserAgent(userAgent, out var osName))
             {
-                return;
-                //throw new Exception($"Couldn't resolve Windows version string: '{versionString}'");
+                _entities[packet.Ethernet.IpV4.Source.ToString()].Os = osName;
+            }
+        }
+
+        private bool TryGetOsNameFromUserAgent(string userAgent, out string? osName)
+        {
+            if (TryGetWindowsOsNameFromUserAgent(userAgent, out osName))
+            {
+                return true;
             }
 
-            if (!WindowsVersionToName.TryGetValue(versionString, out string osName))
+            if (userAgent.Contains("Windows"))
             {
-                throw new Exception($"Couldn't match Windows version string to a Windows name: '{versionString}'");
+                // TODO: change to log instead of console write
+                Console.WriteLine($"Didn't detect Windows in userAgent: {userAgent}");
+            }
+            return false;
+        }
+
+        private bool TryGetWindowsOsNameFromUserAgent(string userAgent, out string? osName)
+        {
+            osName = null;
+            const string windowsIdentifier = "Windows NT ";
+            int windowsNTIndex = userAgent.IndexOf(windowsIdentifier);
+
+            if (windowsNTIndex < 0)
+            {
+                return false;
             }
 
-            _entities[packet.Ethernet.IpV4.Source.ToString()].Os = osName;
+            int versionStartIndex = windowsNTIndex + windowsIdentifier.Length;
+            if (userAgent[versionStartIndex] == ';')
+            {
+                osName = "Windows";
+                return true;
+            }
+
+            string versionUntilEnd = userAgent.Substring(versionStartIndex);
+            var pair = new List<(int TerminateIndex, char TerminateChar)> { (3, ')'), (3, ';'), (4, ')'), (4, ';') }.FirstOrDefault(pair =>
+            {
+                if (pair.TerminateIndex >= versionUntilEnd.Length)
+                {
+                    return false;
+                }
+
+                return versionUntilEnd[pair.TerminateIndex] == pair.TerminateChar;
+            });
+
+            // Got a default value (no match)
+            if (pair.TerminateIndex == 0)
+            {
+                return false;
+            }
+
+            string version = versionUntilEnd.Substring(0, pair.TerminateIndex);
+            if (!Version.TryParse(version, out var _))
+            {
+                return false;
+            }
+
+            if (!WindowsVersionToName.TryGetValue(version, out osName))
+            {
+                throw new Exception($"Couldn't match Windows version string to a Windows name: '{versionUntilEnd}'");
+            }
+
+            return true;
         }
 
         private void TryExtractEntity(Packet packet)
