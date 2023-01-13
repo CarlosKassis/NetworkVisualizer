@@ -22,7 +22,7 @@ function Home() {
         
         for (var i = 0; i < entityCount; i++)
         {
-            elements.push({ data: { id: graph.Entities[i], label: graph.Entities[i] }, position: { x: (i % squareWidth) * 100, y: Math.floor(i / squareWidth) * 100 } });
+            elements.push({ data: { id: graph.Entities[i], label: graph.Entities[i], image: '/computer.png' }, position: { x: (i % squareWidth) * 100, y: Math.floor(i / squareWidth) * 100 } });
         }
 
         var edgeCount = graph.Edges.length;
