@@ -94,7 +94,7 @@ function Home() {
         <br/>
             <FileUploadSingle onCallback={fileUploadCallback} />
             <br />
-            <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 30px 0 rgb(0 0 0 /60%)' }}>
+            <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)' }}>
                 <CytoscapeWrapper graphElements={graphElements} />
                 <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
             </div>

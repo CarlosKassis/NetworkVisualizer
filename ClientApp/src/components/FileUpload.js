@@ -32,7 +32,7 @@ function FileUploadSingle(props) {
 
     return (
         <div>
-            <input type="file" onChange={(e) => setUploadedfile(e.target.files[0])} />
+            <input type="file" onChange={(e) => setUploadedfile(e.target.files[0])} multiple="false" />
             <button onClick={handleFileUpload}>Upload</button>
         </div>
     );
