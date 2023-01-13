@@ -27,26 +27,37 @@ function Home() {
         for (var i = 0; i < entityCount; i++)
         {
             var entityData = graph.Entities[i][1]
-            var serviceCount = entityData.Services.length;
 
             var icon = '/computer.png';
-            var foundAServerService = false;
-            for (const serviceThatMakesYouAServer of serviceNamesThatMakeYouAServer) {
-                for (const service of entityData.Services) {
-                    if (serviceThatMakesYouAServer == service) {
+            var x = (i % squareWidth) * 100;
+            var y = Math.floor(i / squareWidth) * 100;
+            for (const service of entityData.Services)
+            {
+                if (service == "SNMP") {
+                    x = -100;
+                    icon = '/iot.png'
+                    break;
+                }
+
+                var foundAServerService = false;
+                for (const serviceThatMakesYouAServer of serviceNamesThatMakeYouAServer)
+                {
+                    if (serviceThatMakesYouAServer == service)
+                    {
                         icon = '/server.png'
                         foundAServerService = true;
                         break;
                     }
                 }
 
-                if (foundAServerService) {
+                if (foundAServerService)
+                {
                     break;
                 }
             }
 
             var entityIp = graph.Entities[i][0]
-            elements.push({ data: { id: entityIp, label: entityIp, image: icon }, position: { x: (i % squareWidth) * 100, y: Math.floor(i / squareWidth) * 100 } });
+            elements.push({ data: { id: entityIp, label: entityIp, image: icon }, position: { x: x, y: y } });
         }
 
         var edgeCount = graph.Edges.length;
