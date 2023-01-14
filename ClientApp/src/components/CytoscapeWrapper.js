@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 
 function CytoscapeWrapper(props) {
@@ -6,15 +6,19 @@ function CytoscapeWrapper(props) {
     useEffect(() => {
     });
 
-    const handleCyRef = (cy) => {
-        cy.on('tap', 'node', (event) => {
-          alert('Node tapped: ' + event.target.id());
-        });
+    const cyRef = useRef(null);
+
+    const onNodeClick = (event) => {
+        props.onNodeClick(event.target.data().id);
     }
 
     return (
-        <div style={{ width: '80%', backgroundColor: 'FEFEFE' } }>
-            <CytoscapeComponent minZoom={0.2} maxZoom={4} elements={props.graphElements} style={{ height: '75vh' }}
+        <div style={{ width: '80%', backgroundColor: 'FEFEFE' }}>
+            <CytoscapeComponent minZoom={0.2} maxZoom={4} wheelSensitivity={0.2} elements={props.graphElements} style={{ height: '75vh' }}
+                cy={(cy) => {
+                    cyRef.current = cy;
+                    cy.on('tap', 'node', onNodeClick);
+                }}
                 stylesheet={[
                 {
                     selector: 'node',

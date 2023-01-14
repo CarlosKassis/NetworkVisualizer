@@ -13,6 +13,7 @@ namespace dotnet_reactjs.Core
 
     class EntityData
     {
+        public string? Ip;
         public string? Hostname;
         public readonly HashSet<string> Services = new HashSet<string>();
         public string? Os;
@@ -95,7 +96,7 @@ namespace dotnet_reactjs.Core
             var graphClass = new
             {
                 Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
-                Edges = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target })
+                Interactions = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target })
             };
 
             return JsonConvert.SerializeObject(graphClass);
@@ -181,14 +182,17 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
-            if (!packet.Ethernet.IpV4.Source.IsMiscIp())
+            string sourceIp = packet.Ethernet.IpV4.Source.ToString();
+            string destinationIp = packet.Ethernet.IpV4.Destination.ToString();
+
+            if (!PacketUtils.IsMiscIp(sourceIp))
             {
-                _entities.TryAdd(packet.Ethernet.IpV4.Source.ToString(), new EntityData());
+                _entities.TryAdd(sourceIp, new EntityData { Ip = sourceIp });
             }
 
-            if (!packet.Ethernet.IpV4.Destination.IsMiscIp())
+            if (!PacketUtils.IsMiscIp(destinationIp))
             {
-                _entities.TryAdd(packet.Ethernet.IpV4.Destination.ToString(), new EntityData());
+                _entities.TryAdd(destinationIp, new EntityData { Ip = destinationIp });
             }
         }
 
@@ -202,7 +206,7 @@ namespace dotnet_reactjs.Core
             var sourceIp = packet.Ethernet.IpV4.Source.ToString();
             var destIp = packet.Ethernet.IpV4.Destination.ToString();
 
-            if (Packets.IsMiscIp(sourceIp) || Packets.IsMiscIp(destIp))
+            if (PacketUtils.IsMiscIp(sourceIp) || PacketUtils.IsMiscIp(destIp))
             {
                 return;
             }
