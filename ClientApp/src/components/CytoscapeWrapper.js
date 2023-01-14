@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
+import Cytoscape from 'cytoscape';
+import cise from 'cytoscape-cise';
+Cytoscape.use(cise);
 
 function CytoscapeWrapper(props) {
 
@@ -12,9 +15,18 @@ function CytoscapeWrapper(props) {
         props.onNodeClick(event.target.data().id);
     }
 
+    const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' }, 'position': { x: 0, y: 0 } };
+
     return (
         <div style={{ width: '80%', backgroundColor: 'FEFEFE' }}>
-            <CytoscapeComponent minZoom={0.2} maxZoom={4} wheelSensitivity={0.2} elements={props.graphElements} style={{ height: '75vh' }}
+            <CytoscapeComponent minZoom={0.1} maxZoom={8} wheelSensitivity={0.2} style={{ height: '75vh' }}
+                elements={props.graphElements.length ? props.graphElements : [defaultElements] }
+                textureOnViewport={false} // Set true for larger graphs to make moving graph around faster
+                layout={
+                    {
+                        name:'circle'
+                    }
+                }
                 cy={(cy) => {
                     cyRef.current = cy;
 
@@ -31,6 +43,7 @@ function CytoscapeWrapper(props) {
                         'background-opacity': 0
                     },
                 },
+
                 {
                     selector: 'edge',
                     style: {

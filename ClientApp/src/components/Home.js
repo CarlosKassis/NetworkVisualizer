@@ -58,8 +58,8 @@ function Home() {
             var entityData = entity[1];
 
             // Figure position
-            var x = (entityIndex % squareWidth) * 100;
-            var y = Math.floor(entityIndex / squareWidth) * 100;
+            var x = (entityIndex % squareWidth) * 150;
+            var y = Math.floor(entityIndex / squareWidth) * 150;
 
             // Figure icon
             let icon = null;
@@ -86,7 +86,6 @@ function Home() {
         }
 
         return elements;
-
     }
 
 

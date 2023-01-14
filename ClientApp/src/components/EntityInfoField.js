@@ -4,8 +4,12 @@ function EntityInfoField(props) {
 
     return (
         <div>
-            <h5><b>{props.title}: </b>{props.info == null ? "" : props.info}</h5>
-            <br />
+            { props.info != null &&
+                <div>
+                    <h5><b>{props.title}: </b>{props.info == null ? "" : props.info}</h5>
+                    <br />
+                </div>
+            }
         </div>
     );
 }

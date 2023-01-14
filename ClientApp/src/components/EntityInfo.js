@@ -16,7 +16,7 @@ function EntityInfo(props) {
                 marginRight: '0px'
             }
         }>
-            <div style={{ margin: '20px' }}>
+            <div style={{ margin: '20px', marginTop: '40px' }}>
                 <EntityInfoField title={"IP address"} info={props.ip} />
                 <EntityInfoField title={"Hostname"} info={props.hostname} />
                 <EntityInfoField title={"MAC address"} info={props.mac} />
