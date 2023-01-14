@@ -13,9 +13,8 @@ function CytoscapeWrapper(props) {
     }
 
     return (
-        <div style={{ backgroundColor: '#FEFEFE', width: '100%' }}>
-            <CytoscapeComponent minZoom={0.2} maxZoom={4} elements={props.graphElements} style={{ width: '100%', height: '70vh' }}
-                onCy={handleCyRef}
+        <div style={{ width: '80%', backgroundColor: 'FEFEFE' } }>
+            <CytoscapeComponent minZoom={0.2} maxZoom={4} elements={props.graphElements} style={{ height: '75vh' }}
                 stylesheet={[
                 {
                     selector: 'node',

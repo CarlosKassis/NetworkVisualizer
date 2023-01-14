@@ -90,10 +90,12 @@ function Home() {
 
     return (
         <div>
-        <h1>Traffic Analysis</h1>
-        <br/>
-            <FileUploadSingle onCallback={fileUploadCallback} />
-            <br />
+            <div class={"container"}>
+                <h1>Traffic Analysis</h1>
+                <br />
+                <FileUploadSingle onCallback={fileUploadCallback} />
+                <br />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)' }}>
                 <CytoscapeWrapper graphElements={graphElements} />
                 <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />

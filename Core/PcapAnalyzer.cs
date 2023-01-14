@@ -9,6 +9,7 @@ namespace dotnet_reactjs.Core
     using System.Collections.Concurrent;
     using dotnet_reactjs.Utils;
     using System.Collections.Generic;
+    using UAParser;
 
     class EntityData
     {
@@ -41,17 +42,6 @@ namespace dotnet_reactjs.Core
             { 636, "LDAPS" }
         };
 
-        private static readonly Dictionary<string, string> WindowsVersionToName = new Dictionary<string, string>
-        {
-            { "5.1", "Windows XP" },
-            { "5.2", "Windows XP" },
-            { "6.0", "Windows Vista" },
-            { "6.1", "Windows 7" },
-            { "6.2", "Windows 8" },
-            { "6.3", "Windows 8.1" },
-            { "10.0", "Windows 10" }
-        };
-
         private static readonly Dictionary<ushort, string> UdpPortToServiceName = new Dictionary<ushort, string>()
         {
             { 53, "DNS" },
@@ -61,7 +51,6 @@ namespace dotnet_reactjs.Core
         };
 
         private static readonly (int TerminateIndex, char TerminateChar)[] WindowsAfterVersionTerminators = new (int TerminateIndex, char TerminateChar)[] { (3, ')'), (3, ';'), (4, ')'), (4, ';') };
-        private static readonly List<string> OsNamesThatCanBeInHttpUserAgent = new List<string> { "Ubuntu", "Linux", "Mac" }; // Putting Linux flavors before "Linux" is important to detect flavor
 
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
@@ -177,67 +166,12 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
-            if (TryGetOsNameFromUserAgent(userAgent, out var osName))
+            Parser userAgentParser = Parser.GetDefault();
+            ClientInfo clientInfo = userAgentParser.Parse(userAgent);
+            if (clientInfo.OS != null)
             {
-                _entities[packet.Ethernet.IpV4.Source.ToString()].Os = osName;
+                _entities[packet.Ethernet.IpV4.Source.ToString()].Os = clientInfo.OS.ToString();
             }
-        }
-        private bool TryGetOsNameFromUserAgent(string userAgent, out string? osName)
-        {
-            if (TryGetWindowsOsNameFromUserAgent(userAgent, out osName))
-            {
-                return true;
-            }
-
-            osName = OsNamesThatCanBeInHttpUserAgent.FirstOrDefault(possibleOsName => userAgent.Contains(possibleOsName));
-            return osName != null;
-        }
-
-        private bool TryGetWindowsOsNameFromUserAgent(string userAgent, out string? osName)
-        {
-            osName = null;
-            const string windowsIdentifier = "Windows NT ";
-            int windowsNTIndex = userAgent.IndexOf(windowsIdentifier);
-
-            if (windowsNTIndex < 0)
-            {
-                if (userAgent.Contains("Windows"))
-                {
-                    osName = "Windows";
-                }
-
-                return false;
-            }
-
-            string versionUntilEnd = userAgent.Substring(windowsNTIndex + windowsIdentifier.Length);
-            var pair = WindowsAfterVersionTerminators.FirstOrDefault(pair =>
-            {
-                if (pair.TerminateIndex >= versionUntilEnd.Length)
-                {
-                    return false;
-                }
-
-                return versionUntilEnd[pair.TerminateIndex] == pair.TerminateChar;
-            });
-
-            // Got a default value (no match)
-            if (pair.TerminateIndex == 0)
-            {
-                return false;
-            }
-
-            string version = versionUntilEnd.Substring(0, pair.TerminateIndex);
-            if (!Version.TryParse(version, out var _))
-            {
-                return false;
-            }
-
-            if (!WindowsVersionToName.TryGetValue(version, out osName))
-            {
-                throw new Exception($"Couldn't match Windows version string to a Windows name: '{versionUntilEnd}'");
-            }
-
-            return true;
         }
 
         private void TryExtractEntity(Packet packet)
