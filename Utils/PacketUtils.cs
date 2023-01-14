@@ -13,15 +13,27 @@ namespace dotnet_reactjs.Utils
 
         public static bool IsUdp(this Packet? packet)
         {
-            return packet?.Ethernet?.IpV4?.Udp?.IsValid ?? false;
+            var ip = packet?.Ethernet?.IpV4;
+            if (!(ip?.IsValid ?? false))
+            {
+                return false;
+            }
+
+            return ip.Udp?.IsValid ?? false;
         }
 
         public static bool IsTcp(this Packet? packet)
         {
-            return packet?.Ethernet?.IpV4?.Tcp?.IsValid ?? false;
+            var ip = packet?.Ethernet?.IpV4;
+            if (!(ip?.IsValid ?? false))
+            {
+                return false;
+            }
+
+            return ip.Tcp?.IsValid ?? false;
         }
 
-        public static bool IsMiscIp(string ip)
+        public static bool IsMiscIp(this string ip)
         {
             if (MiscIps.Contains(ip))
             {
@@ -38,7 +50,7 @@ namespace dotnet_reactjs.Utils
 
         public static bool IsMiscIp(this IpV4Address address)
         {
-            return IsMiscIp(address.ToString());
+            return address.ToString().IsMiscIp();
         }
     }
 }

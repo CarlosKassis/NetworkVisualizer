@@ -46,8 +46,6 @@ function Home() {
         setDomain(entityData.Domain);
     }
 
-    const serviceNamesThatMakeYouAServer = ["HTTP", "HTTPS", "DNS", "DHCP"]
-
     // TODO: move to a class
     const generateGraphElements = (networkInfo) => {
 
@@ -55,49 +53,35 @@ function Home() {
         var entityCount = networkInfo.Entities.length;
         var squareWidth = Math.floor(Math.sqrt(entityCount));
 
-        var i = 0;
+        var entityIndex = 0;
         for (const entity of networkInfo.Entities)
         {
             var entityData = entity[1];
 
-            var icon = '/computer.png';
-            var x = (i % squareWidth) * 100;
-            var y = Math.floor(i / squareWidth) * 100;
-            for (const service of entityData.Services)
-            {
-                if (service == "SNMP") {
-                    icon = '/iot.png'
-                    break;
-                }
+            let icon = null;
+            var x = (entityIndex % squareWidth) * 100;
+            var y = Math.floor(entityIndex / squareWidth) * 100;
+            entityIndex++
 
-                var foundAServerService = false;
-                for (const serviceThatMakesYouAServer of serviceNamesThatMakeYouAServer)
-                {
-                    if (serviceThatMakesYouAServer == service)
-                    {
-                        icon = '/server.png'
-                        foundAServerService = true;
-                        break;
-                    }
-                }
-
-                if (foundAServerService)
-                {
-                    break;
-                }
+            // TODO: use enums
+            if (!entityData.Type || entityData.Type === "Computer") {
+                icon = '/computer.png';
+            } else if (entityData.Type === "Server") {
+                icon = '/server.png';
+            } else {
+                icon = '/iot.png';
             }
 
             var entityIp = entity[0]
             elements.push({ 'data': { 'id': entityIp, 'label': entityIp, 'image': icon }, 'position': { x: x, y: y } });
-            i++;
         }
 
         for (const interaction of networkInfo.Interactions) {
-
             elements.push({ 'data': { 'source': interaction[0], 'target': interaction[1] }, 'classes': 'edge' });
         }
 
         return elements;
+
     }
 
 

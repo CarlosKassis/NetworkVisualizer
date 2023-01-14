@@ -10,15 +10,64 @@ namespace dotnet_reactjs.Core
     using dotnet_reactjs.Utils;
     using System.Collections.Generic;
     using UAParser;
+    using PcapDotNet.Packets.Dns;
 
-    class EntityData
+    // Extracting Os from certain sources has more priority than other sources
+    // The lower, the more priority it has
+    public enum OsSetPriority
     {
-        public string? Ip;
-        public string? Hostname;
+        FromHttpRequest,
+        None
+    };
+
+    class InteractionData
+    {
+
+    }
+
+    class ConcurrentEntityData
+    {
+        private OsSetPriority _priority = OsSetPriority.None;
+        private object _lock = new object();
+
         public readonly HashSet<string> Services = new HashSet<string>();
-        public string? Os;
-        public string? Domain;
-        public string? Mac;
+        public string? Ip { get; private set; }
+        public string? Hostname { get; private set; }
+        public string? Domain { get; private set; }
+        public string? Mac { get; private set; }
+        public string? Os { get; private set; }
+
+        public string Type = "Computer";
+
+        public ConcurrentEntityData(string ip)
+        {
+            Ip = ip;
+        }
+
+        public void SetOs(string os, OsSetPriority priority)
+        {
+            if (os == null)
+            {
+                return;
+            }
+
+            lock (_lock)
+            {
+                if (priority < _priority)
+                {
+                    _priority = priority;
+                    Os = os;
+                }
+            }
+        }
+
+        public void SetHostname(string hostname)
+        {
+            lock (_lock)
+            {
+                Hostname = hostname;
+            }
+        }
     }
 
     public class PcapAnalyzer
@@ -51,11 +100,14 @@ namespace dotnet_reactjs.Core
             { 161, "SNMP" }
         };
 
-        private static readonly (int TerminateIndex, char TerminateChar)[] WindowsAfterVersionTerminators = new (int TerminateIndex, char TerminateChar)[] { (3, ')'), (3, ';'), (4, ')'), (4, ';') };
+        private static readonly HashSet<string> ServicesThatMakeYouAServer = new HashSet<string>
+        {
+            "DNS", "HTTP", "HTTPS"
+        };
 
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
-        private readonly ConcurrentDictionary<string, EntityData> _entities = new ConcurrentDictionary<string, EntityData>();
+        private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string _filePath;
@@ -81,7 +133,7 @@ namespace dotnet_reactjs.Core
 
             // Process in parallel
             await AnalyzeAggregatedPacketsInParallel(ThreadCount);
-
+            await DoFinalProcessingOnData(ThreadCount);
             return GenerateCytoscapeGraphJsonFromAnalysis();
         }
 
@@ -105,14 +157,46 @@ namespace dotnet_reactjs.Core
         private void AggregatePacketToMemory(Packet packet)
         {
             // Optimization: schedule for thread to process immediately when
-            // N packets are aggregated (N = totalPackets/threadCount+1)
+            // N packets are aggregated (N = totalPackets/threadCount + 1)
             _packets.Add(packet);
+        }
+
+        private async Task DoFinalProcessingOnData(int threadCount)
+        {
+            var entities = _entities.ToArray();
+            int chunkSize = entities.Length / threadCount + 1;
+            await Task.WhenAll(Enumerable.Range(0, threadCount).Select(i =>
+            {
+                return Task.Run(() =>
+                {
+                    int start = i * chunkSize;
+                    int end = i * chunkSize + chunkSize;
+                    for (int i = start; i < end; i++)
+                    {
+                        if (i >= entities.Length)
+                        {
+                            break;
+                        }
+
+                        // Check if entity provides services that are server-like
+                        foreach (var service in entities[i].Value.Services)
+                        {
+                            if (ServicesThatMakeYouAServer.Contains(service))
+                            {
+                                entities[i].Value.Type = "Server";
+                                break;
+                            }
+                        }
+                    }
+                });
+            }));
         }
 
         private async Task AnalyzeAggregatedPacketsInParallel(int threadCount)
         {
             var packets = _packets.ToArray();
             int chunkSize = packets.Length / threadCount + 1;
+
             await Task.WhenAll(Enumerable.Range(0, threadCount).Select(i =>
             {
                 return Task.Run(() => AnalyzePackets(packets, i * chunkSize, chunkSize));
@@ -141,6 +225,69 @@ namespace dotnet_reactjs.Core
             TryExtractInteraction(packet);
             TryExtractDeviceProvidedService(packet);
             TryExtractOsFromHttp(packet);
+            TryExtractHostnameFromDnsResponse(packet);
+        }
+
+        private void TryExtractHostnameFromDnsResponse(Packet packet)
+        {
+            if (!packet.IsUdp())
+            {
+                return;
+            }
+
+            if (packet.Ethernet.IpV4.Udp.SourcePort != 53)
+            {
+                return;
+            }
+
+            if (!(packet?.Ethernet?.IpV4?.Udp?.Dns?.IsValid ?? false))
+            {
+                return;
+            }
+
+            var dns = packet.Ethernet.IpV4.Udp.Dns;
+            if (!dns.IsResponse)
+            {
+                return;
+            }
+
+            if (dns.Answers == null)
+            {
+                return;
+            }
+
+            foreach (var answer in dns.Answers)
+            {
+                if (answer.DnsType != DnsType.A || answer.DnsClass != DnsClass.Internet)
+                {
+                    continue;
+                }
+
+                if (answer.Data == null)
+                {
+                    continue;
+                }
+
+                // TODO: add type=dns_query to interaction between DNS client and queried target
+                string hostname = answer.DomainName.ToString();
+                if (hostname.Last() == '.')
+                {
+                    hostname = hostname.Remove(hostname.Length - 1);
+                }
+
+                if (hostname.EndsWith(".local"))
+                {
+                    hostname = hostname.Remove(hostname.Length - ".local".Length);
+                }
+
+                string ip = ((DnsResourceDataIpV4)answer.Data).Data.ToString();
+                if (!_entities.ContainsKey(ip))
+                {
+                    _entities[ip] = new ConcurrentEntityData(ip);
+                }
+
+                _entities[ip].SetHostname(hostname);
+            }
         }
 
         private void TryExtractOsFromHttp(Packet packet)
@@ -150,7 +297,18 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
+            if (packet.Ethernet.IpV4.Source.IsMiscIp() || packet.Ethernet.IpV4.Destination.IsMiscIp())
+            {
+                return;
+            }
+
             if (!(packet?.Ethernet?.IpV4?.Tcp?.Http?.IsValid ?? false))
+            {
+                return;
+            }
+
+            // Note: later on in method there might be a race-condition on entity.Os, not critical
+            if (_entities[packet.Ethernet.IpV4.Source.ToString()].Os != null)
             {
                 return;
             }
@@ -171,7 +329,7 @@ namespace dotnet_reactjs.Core
             ClientInfo clientInfo = userAgentParser.Parse(userAgent);
             if (clientInfo.OS != null)
             {
-                _entities[packet.Ethernet.IpV4.Source.ToString()].Os = clientInfo.OS.ToString();
+                _entities[packet.Ethernet.IpV4.Source.ToString()].SetOs(clientInfo.OS.ToString(), OsSetPriority.FromHttpRequest);
             }
         }
 
@@ -185,14 +343,14 @@ namespace dotnet_reactjs.Core
             string sourceIp = packet.Ethernet.IpV4.Source.ToString();
             string destinationIp = packet.Ethernet.IpV4.Destination.ToString();
 
-            if (!PacketUtils.IsMiscIp(sourceIp))
+            if (!sourceIp.IsMiscIp())
             {
-                _entities.TryAdd(sourceIp, new EntityData { Ip = sourceIp });
+                _entities.TryAdd(sourceIp, new ConcurrentEntityData(sourceIp));
             }
 
-            if (!PacketUtils.IsMiscIp(destinationIp))
+            if (!destinationIp.IsMiscIp())
             {
-                _entities.TryAdd(destinationIp, new EntityData { Ip = destinationIp });
+                _entities.TryAdd(destinationIp, new ConcurrentEntityData(destinationIp));
             }
         }
 
@@ -206,7 +364,7 @@ namespace dotnet_reactjs.Core
             var sourceIp = packet.Ethernet.IpV4.Source.ToString();
             var destIp = packet.Ethernet.IpV4.Destination.ToString();
 
-            if (PacketUtils.IsMiscIp(sourceIp) || PacketUtils.IsMiscIp(destIp))
+            if (sourceIp.IsMiscIp() || destIp.IsMiscIp())
             {
                 return;
             }
@@ -218,11 +376,6 @@ namespace dotnet_reactjs.Core
 
         private void TryExtractDeviceProvidedService(Packet packet)
         {
-            if (!packet.HasIpLayer())
-            {
-                return;
-            }
-
             if (!packet.IsTcp() && !packet.IsUdp())
             {
                 return;
