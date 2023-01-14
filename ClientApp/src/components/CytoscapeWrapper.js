@@ -18,8 +18,7 @@ function CytoscapeWrapper(props) {
                 cy={(cy) => {
                     cyRef.current = cy;
 
-                    // TODO: see what's causing problems
-                    //cy.on('tap', 'node', onNodeClick);
+                    cy.on('tap', 'node', onNodeClick);
                 }}
                 stylesheet={[
                 {
