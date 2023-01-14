@@ -32,7 +32,6 @@ function Home() {
 
     const writeEntityDataToEntityInfo = (nodeId) =>
     {
-        alert(JSON.stringify(nodeId));
         if (!entityToData) {
             return;
         }
@@ -58,11 +57,12 @@ function Home() {
         {
             var entityData = entity[1];
 
-            let icon = null;
+            // Figure position
             var x = (entityIndex % squareWidth) * 100;
             var y = Math.floor(entityIndex / squareWidth) * 100;
-            entityIndex++
 
+            // Figure icon
+            let icon = null;
             // TODO: use enums
             if (!entityData.Type || entityData.Type === "Computer") {
                 icon = '/computer.png';
@@ -72,8 +72,13 @@ function Home() {
                 icon = '/iot.png';
             }
 
+            // Figure label
+            let label = entityData.Hostname ? entityData.Hostname : entityData.Ip;
+
             var entityIp = entity[0]
-            elements.push({ 'data': { 'id': entityIp, 'label': entityIp, 'image': icon }, 'position': { x: x, y: y } });
+            elements.push({ 'data': { 'id': entityIp, 'label': label, 'image': icon }, 'position': { x: x, y: y } });
+
+            entityIndex++
         }
 
         for (const interaction of networkInfo.Interactions) {
