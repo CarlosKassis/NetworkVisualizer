@@ -235,7 +235,7 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
-            if (packet.Ethernet.IpV4.Udp.SourcePort != 53)
+            if (packet.Ethernet.IpV4.Udp.SourcePort != 53 && packet.Ethernet.IpV4.Udp.SourcePort != 5353)
             {
                 return;
             }
