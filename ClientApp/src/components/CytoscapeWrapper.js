@@ -17,7 +17,9 @@ function CytoscapeWrapper(props) {
             <CytoscapeComponent minZoom={0.2} maxZoom={4} wheelSensitivity={0.2} elements={props.graphElements} style={{ height: '75vh' }}
                 cy={(cy) => {
                     cyRef.current = cy;
-                    cy.on('tap', 'node', onNodeClick);
+
+                    // TODO: see what's causing problems
+                    //cy.on('tap', 'node', onNodeClick);
                 }}
                 stylesheet={[
                 {
