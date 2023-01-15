@@ -27,6 +27,7 @@ function Home() {
         }
 
         setEntityToData(entityDictionary);
+        setEntityInfoPanelData()
         setGraphElements(generateGraphElements(networkInfo));
     }
 
@@ -37,22 +38,22 @@ function Home() {
         }
 
         let entityData = entityToData[nodeId];
+        setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain);
+    }
 
-        setIp(entityData.Ip);
-        setHostname(entityData.Hostname);
-        setMac(entityData.Mac);
-        setOs(entityData.Os);
-        setDomain(entityData.Domain);
+    const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null) => {
+        setIp(ip);
+        setHostname(hostname);
+        setMac(mac);
+        setOs(os);
+        setDomain(domain);
     }
 
     // TODO: move to a class
     const generateGraphElements = (networkInfo) => {
 
         let elements = []
-        var entityCount = networkInfo.Entities.length;
-        var squareWidth = Math.floor(Math.sqrt(entityCount));
 
-        var entityIndex = 0;
         for (const entity of networkInfo.Entities)
         {
             let entityIp = entity[0]
@@ -81,8 +82,6 @@ function Home() {
             let label = entityData.Hostname ? entityData.Hostname : entityData.Ip;
 
             elements.push({ 'data': { 'id': entityIp, 'label': label, 'image': icon }, 'position': { x: x, y: y } });
-
-            entityIndex++
         }
 
         for (const interaction of networkInfo.Interactions) {

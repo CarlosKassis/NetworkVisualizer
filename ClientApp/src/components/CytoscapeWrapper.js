@@ -19,12 +19,12 @@ function CytoscapeWrapper(props) {
 
     return (
         <div style={{ width: '80%', backgroundColor: 'FEFEFE' }}>
-            <CytoscapeComponent minZoom={0.1} maxZoom={8} wheelSensitivity={0.2} style={{ height: '75vh' }}
+            <CytoscapeComponent minZoom={0.01} maxZoom={8} style={{ height: '75vh' }}
                 elements={props.graphElements.length ? props.graphElements : [defaultElements] }
-                textureOnViewport={false} // Set true for larger graphs to make moving graph around faster
+                textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
                     cyRef.current = cy;
-
+                    cy.center();
                     cy.on('tap', 'node', onNodeClick);
                 }}
                 stylesheet={[
@@ -43,7 +43,7 @@ function CytoscapeWrapper(props) {
                     selector: 'edge',
                     style: {
                         'width': '1.5px',
-                        'line-color': '#999'
+                        'line-color': '#777'
                     }
                 }
             ]} />

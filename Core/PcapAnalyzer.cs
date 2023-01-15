@@ -144,7 +144,7 @@ namespace dotnet_reactjs.Core
 
         private float SubnetCircleRadiusOnGraph(int subnetEntityCount)
         {
-            return (float)Math.Sqrt(subnetEntityCount) * 60f; 
+            return (float)Math.Sqrt(subnetEntityCount) * 100f; 
         }
 
         private string GenerateCytoscapeGraphJsonFromAnalysis()
@@ -157,33 +157,43 @@ namespace dotnet_reactjs.Core
             // Generate circle coordinates for subnets
             var subnets = _entities.GroupBy(entity => entity.Value.Subnet).ToList();
             float maxSubnetCircleRadius = SubnetCircleRadiusOnGraph(subnets.Select(subnet => subnet.Count()).Max());
-            float averageSubnetCircleRadius = subnets.Select(subnet => SubnetCircleRadiusOnGraph(subnet.Count())).Average();
-            float viewBoxWidth = (float)Math.Sqrt(averageSubnetCircleRadius * 2f) * 200f;
+            float averageSubnetCircleRadius = SubnetCircleRadiusOnGraph(subnets.Select(subnet => subnet.Count()).Max());
+            float viewBoxWidth = (float)Math.Sqrt(averageSubnetCircleRadius * 2f) * 400f;
 
-            var subnetCircleCenters = UniformPoissonDiskSampler.SampleRectangle(
+            Dictionary<string, double[]>? subnetEntityPositions = null;
+
+            int maxTries = 10;
+            for (int i = 0; i < maxTries; i++)
+            {
+                var subnetCircleCenters = UniformPoissonDiskSampler.SampleRectangle(
                 new Vector2(0f, 0f),
                 new Vector2(viewBoxWidth, viewBoxWidth),
                 2 * maxSubnetCircleRadius);
 
-            Dictionary<string, double[]>? subnetEntityPositions = null;
-            if (subnetCircleCenters.Count < subnets.Count)
-            {
-                Console.WriteLine("Not enough circle coordinates for subnets, find better generating parameters!");
-            }
-            else
-            {
+
+                if (subnetCircleCenters.Count < subnets.Count)
+                {
+                    viewBoxWidth *= 1.2f;
+                    continue;
+                }
+
                 int subnetIndex = 0;
                 subnetEntityPositions = new Dictionary<string, double[]>();
                 subnets.ForEach(subnet =>
                 {
+                    Console.WriteLine($"Subnet - {subnet.First().Value.Subnet}");
                     double subnetRadius = SubnetCircleRadiusOnGraph(subnet.Count());
                     var subnetCenter = subnetCircleCenters[subnetIndex];
                     float radiansBetweenEntities = 2f * (float)Math.PI / subnet.Count();
                     int entityIndex = 0;
                     foreach (var entity in subnet)
                     {
-                        subnetEntityPositions[entity.Key] = new double[] { subnetCenter.X + subnetRadius * Math.Cos(radiansBetweenEntities * entityIndex), subnetCenter.Y + subnetRadius * Math.Sin(radiansBetweenEntities * entityIndex) };
+                        double x = subnetCenter.X + subnetRadius * Math.Cos(radiansBetweenEntities * entityIndex) - viewBoxWidth / 2.0;
+                        double y = subnetCenter.Y + subnetRadius * Math.Sin(radiansBetweenEntities * entityIndex) - viewBoxWidth / 2.0;
+                        var position = new double[] { x, y };
+                        subnetEntityPositions[entity.Key] = position;
                         entityIndex++;
+                        Console.WriteLine($"{Math.Round(position[0], 2)},{Math.Round(position[1], 2)}");
                     }
 
                     subnetIndex++;
