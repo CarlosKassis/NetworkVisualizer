@@ -12,6 +12,8 @@ namespace dotnet_reactjs.Core
     using System.Numerics;
     using UAParser;
     using PcapDotNet.Packets.Dns;
+    using Utils.Dhcp;
+    using System.Runtime.Intrinsics.Arm;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -281,6 +283,35 @@ namespace dotnet_reactjs.Core
             TryExtractDeviceProvidedService(packet);
             TryExtractOsFromHttp(packet);
             TryExtractHostnameFromDnsResponse(packet);
+            TryExtractDHCPInfo(packet);
+        }
+
+        private void TryExtractDHCPInfo(Packet packet)
+        {
+            if (!packet.IsUdp())
+            {
+                return;
+            }
+
+            // Return if not DHCP message from DHCP server
+            if (packet.Ethernet.IpV4.Udp.SourcePort != 67)
+            {
+                return;
+            }
+
+            var udpBytes = packet.Ethernet.IpV4.Udp.Payload?.ToMemoryStream()?.ToArray();
+            if (udpBytes == null)
+            {
+                return;
+            }
+
+            var dhcp = DHCPPacketParser.Parse(udpBytes);
+            if (dhcp == null)
+            {
+                return;
+            }
+
+            // DHCP CODE GOES HERE
         }
 
         private void TryExtractHostnameFromDnsResponse(Packet packet)

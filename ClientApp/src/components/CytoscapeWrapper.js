@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 
 function CytoscapeWrapper(props) {
 
+    const [initialRender, setInitialRender] = useState(true)
     const cyRef = useRef(null);
 
     useEffect(() => {
@@ -26,6 +27,11 @@ function CytoscapeWrapper(props) {
                 elements={props.graphElements.length ? props.graphElements : [defaultElements] }
                 textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
+                    if (initialRender) {
+                        cy.center();
+                        setInitialRender(false);
+                    }
+
                     cyRef.current = cy;
                     cy.on('tap', 'node', onNodeClick);
                 }}
