@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import FileUploadSingle from './FileUpload'
 import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
+import GraphFilter from './GraphFilter';
 
 function Home() {
 
-    const [graphElements, setGraphElements] = useState([]);
+    const [graphElements, setGraphElements] = useState([]); // Is a full/filtered fullGraphElements
+    const [fullGraphElements, setFullGraphElements] = useState([]);
     const [entityToData, setEntityToData] = useState(null)
 
     const [ip, setIp] = useState(null);
@@ -13,6 +15,11 @@ function Home() {
     const [mac, setMac] = useState(null);
     const [hostname, setHostname] = useState(null);
     const [domain, setDomain] = useState(null);
+    const [needToRecenter, setNeedToRecenter] = useState(false);
+
+    useEffect(() => {
+        setNeedToRecenter(false);
+    });
 
     const fileUploadCallback = (json) =>
     {
@@ -28,7 +35,17 @@ function Home() {
 
         setEntityToData(entityDictionary);
         setEntityInfoPanelData()
-        setGraphElements(generateGraphElements(networkInfo));
+        var elements = generateGraphElements(networkInfo);
+
+        // A WORKING FILTERING :DDDD
+        /*elements = elements.filter((element) => {
+            return element.data.id && !ipStartsWithOne(element.data.id)
+                || element.data.source && !ipStartsWithOne(element.data.source) && !ipStartsWithOne(element.data.target) 
+        })*/
+
+        setGraphElements(elements);
+        setFullGraphElements(elements);
+        setNeedToRecenter(true);
     }
 
     const writeEntityDataToEntityInfo = (nodeId) =>
@@ -42,6 +59,7 @@ function Home() {
     }
 
     const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null) => {
+        
         setIp(ip);
         setHostname(hostname);
         setMac(mac);
@@ -91,17 +109,15 @@ function Home() {
         return elements;
     }
 
-
     return (
         <div>
             <div className={"container"}>
-                <h1>Traffic Analysis</h1>
-                <br />
+                <h2>Traffic Analysis</h2>
                 <FileUploadSingle onCallback={fileUploadCallback} />
                 <br />
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)' }}>
-                <CytoscapeWrapper graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
+                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
                 <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
             </div>
         </div>

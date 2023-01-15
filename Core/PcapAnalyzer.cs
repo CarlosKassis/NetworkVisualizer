@@ -181,7 +181,6 @@ namespace dotnet_reactjs.Core
                 subnetEntityPositions = new Dictionary<string, double[]>();
                 subnets.ForEach(subnet =>
                 {
-                    Console.WriteLine($"Subnet - {subnet.First().Value.Subnet}");
                     double subnetRadius = SubnetCircleRadiusOnGraph(subnet.Count());
                     var subnetCenter = subnetCircleCenters[subnetIndex];
                     float radiansBetweenEntities = 2f * (float)Math.PI / subnet.Count();
@@ -193,7 +192,6 @@ namespace dotnet_reactjs.Core
                         var position = new double[] { x, y };
                         subnetEntityPositions[entity.Key] = position;
                         entityIndex++;
-                        Console.WriteLine($"{Math.Round(position[0], 2)},{Math.Round(position[1], 2)}");
                     }
 
                     subnetIndex++;
