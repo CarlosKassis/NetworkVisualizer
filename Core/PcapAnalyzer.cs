@@ -15,7 +15,7 @@ namespace dotnet_reactjs.Core
     using Utils.Dhcp;
     using dotnet_reactjs.Utils.Dhcp.Options;
     using dotnet_reactjs.Utils.Dhcp.Enums;
-    using System.Net.Sockets;
+    using Microsoft.AspNetCore.HttpOverrides;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -24,11 +24,6 @@ namespace dotnet_reactjs.Core
         FromHttpRequest,
         None
     };
-
-    class InteractionData
-    {
-
-    }
 
     class ConcurrentEntityData
     {
@@ -69,12 +64,38 @@ namespace dotnet_reactjs.Core
             }
         }
 
+        public void SetMac(string mac)
+        {
+            lock (_lock)
+            {
+                Mac = mac;
+            }
+        }
+
         public void SetHostname(string hostname)
         {
             lock (_lock)
             {
                 Hostname = hostname;
             }
+        }
+
+        public void SetDomain(string domain)
+        {
+            lock (_lock)
+            {
+                Domain = domain;
+            }
+        }
+    }
+
+    class ConcurrentSubnetData
+    {
+        public string? Domain { get; private set; }
+
+        public ConcurrentSubnetData(string domain = null)
+        {
+            Domain = domain;
         }
     }
 
@@ -117,6 +138,7 @@ namespace dotnet_reactjs.Core
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
+        private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string _filePath;
 
@@ -323,13 +345,38 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
-            var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
-            var subnetMask = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
+            var subnetMaskBytes = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
+            if (subnetMaskBytes == null)
+            {
+                return;
+            }
+
             var dhcpServerIp = ((DHCPOptionDHCPServerIdentifier)dhcp.options.FirstOrDefault(x => x is DHCPOptionDHCPServerIdentifier mask))?.ServerIdentifier;
+            byte[] subnetIpBytes;
+            if (dhcp.ciaddr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                // AND client IP and subnet mask to get subnet address
+                subnetIpBytes = dhcp.ciaddr.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+            }
+            else if (dhcpServerIp != null && dhcpServerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                // AND DHCP server IP and subnet mask to get subnet address
+                subnetIpBytes = dhcpServerIp.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+            }
+            else
+            {
+                // Couldn't get a reliable ip info from DHCP packet
+                return;
+            }
+
+            var subnetIp = BitConverter.ToString(subnetIpBytes).Replace("-", string.Empty);
+            var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
+            _subnets.TryAdd(subnetIp, new ConcurrentSubnetData(subnetDomain));
+
             var routers = ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?
                 .Select(ip =>
                 {
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                     {
                         return ip.ToString();
                     }
@@ -338,7 +385,19 @@ namespace dotnet_reactjs.Core
                 })
                 .Where(ip => ip != null)
                 .ToList();
+
+            if (routers != null)
+            {
+                routers.ForEach(router =>
+                {
+
+                });
+            }
+
+            var clientIp = dhcp.ciaddr.ToString();
             
+            var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
+
             // DO PROCESSING ON DHCP
         }
 
