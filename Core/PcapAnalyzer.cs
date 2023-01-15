@@ -13,7 +13,9 @@ namespace dotnet_reactjs.Core
     using UAParser;
     using PcapDotNet.Packets.Dns;
     using Utils.Dhcp;
-    using System.Runtime.Intrinsics.Arm;
+    using dotnet_reactjs.Utils.Dhcp.Options;
+    using dotnet_reactjs.Utils.Dhcp.Enums;
+    using System.Net.Sockets;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -311,7 +313,33 @@ namespace dotnet_reactjs.Core
                 return;
             }
 
-            // DHCP CODE GOES HERE
+            if (dhcp.op != MessageOpCode.BOOTREPLY)
+            {
+                return;
+            }
+
+            if (!dhcp.options.Any(x => x is DHCPOptionDHCPMessageType type && type.MessageType == DHCPMessageType.DHCPACK))
+            {
+                return;
+            }
+
+            var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
+            var subnetMask = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
+            var dhcpServerIp = ((DHCPOptionDHCPServerIdentifier)dhcp.options.FirstOrDefault(x => x is DHCPOptionDHCPServerIdentifier mask))?.ServerIdentifier;
+            var routers = ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?
+                .Select(ip =>
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        return ip.ToString();
+                    }
+
+                    return null;
+                })
+                .Where(ip => ip != null)
+                .ToList();
+            
+            // DO PROCESSING ON DHCP
         }
 
         private void TryExtractHostnameFromDnsResponse(Packet packet)
