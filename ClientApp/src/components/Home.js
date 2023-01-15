@@ -55,11 +55,16 @@ function Home() {
         var entityIndex = 0;
         for (const entity of networkInfo.Entities)
         {
-            var entityData = entity[1];
+            let entityIp = entity[0]
+            let entityData = entity[1];
+            let x = 0;
+            let y = 0;
 
-            // Figure position
-            var x = (entityIndex % squareWidth) * 150;
-            var y = Math.floor(entityIndex / squareWidth) * 150;
+            if (networkInfo.EntityPositions != null) {
+                let entityPosition = networkInfo.EntityPositions[entityIp]
+                x = entityPosition[0];
+                y = entityPosition[1];
+            }
 
             // Figure icon
             let icon = null;
@@ -75,7 +80,6 @@ function Home() {
             // Figure label
             let label = entityData.Hostname ? entityData.Hostname : entityData.Ip;
 
-            var entityIp = entity[0]
             elements.push({ 'data': { 'id': entityIp, 'label': label, 'image': icon }, 'position': { x: x, y: y } });
 
             entityIndex++

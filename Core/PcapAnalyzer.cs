@@ -9,6 +9,7 @@ namespace dotnet_reactjs.Core
     using System.Collections.Concurrent;
     using dotnet_reactjs.Utils;
     using System.Collections.Generic;
+    using System.Numerics;
     using UAParser;
     using PcapDotNet.Packets.Dns;
 
@@ -36,12 +37,15 @@ namespace dotnet_reactjs.Core
         public string? Domain { get; private set; }
         public string? Mac { get; private set; }
         public string? Os { get; private set; }
-
-        public string Type = "Computer";
+        public string? Type = "Computer";
+        public string? Subnet { get; private set; }
 
         public ConcurrentEntityData(string ip)
         {
             Ip = ip;
+
+            var ipParts = ip.Split('.');
+            Subnet = $"{ip[0]}.{ip[1]}.{ip[2]}.0/24";
         }
 
         public void SetOs(string os, OsSetPriority priority)
@@ -134,7 +138,13 @@ namespace dotnet_reactjs.Core
             // Process in parallel
             await AnalyzeAggregatedPacketsInParallel(ThreadCount);
             await DoFinalProcessingOnData(ThreadCount);
+
             return GenerateCytoscapeGraphJsonFromAnalysis();
+        }
+
+        private float SubnetCircleRadiusOnGraph(int subnetEntityCount)
+        {
+            return (float)Math.Sqrt(subnetEntityCount) * 60f; 
         }
 
         private string GenerateCytoscapeGraphJsonFromAnalysis()
@@ -144,11 +154,48 @@ namespace dotnet_reactjs.Core
             var networkGraph = new UndirectedGraph<string, UndirectedEdge<string>>();
             networkGraph.AddVerticesAndEdgeRange(edges);
 
+            // Generate circle coordinates for subnets
+            var subnets = _entities.GroupBy(entity => entity.Value.Subnet).ToList();
+            float maxSubnetCircleRadius = SubnetCircleRadiusOnGraph(subnets.Select(subnet => subnet.Count()).Max());
+            float averageSubnetCircleRadius = subnets.Select(subnet => SubnetCircleRadiusOnGraph(subnet.Count())).Average();
+            float viewBoxWidth = (float)Math.Sqrt(averageSubnetCircleRadius * 2f) * 200f;
+
+            var subnetCircleCenters = UniformPoissonDiskSampler.SampleRectangle(
+                new Vector2(0f, 0f),
+                new Vector2(viewBoxWidth, viewBoxWidth),
+                2 * maxSubnetCircleRadius);
+
+            Dictionary<string, double[]>? subnetEntityPositions = null;
+            if (subnetCircleCenters.Count < subnets.Count)
+            {
+                Console.WriteLine("Not enough circle coordinates for subnets, find better generating parameters!");
+            }
+            else
+            {
+                int subnetIndex = 0;
+                subnetEntityPositions = new Dictionary<string, double[]>();
+                subnets.ForEach(subnet =>
+                {
+                    double subnetRadius = SubnetCircleRadiusOnGraph(subnet.Count());
+                    var subnetCenter = subnetCircleCenters[subnetIndex];
+                    float radiansBetweenEntities = 2f * (float)Math.PI / subnet.Count();
+                    int entityIndex = 0;
+                    foreach (var entity in subnet)
+                    {
+                        subnetEntityPositions[entity.Key] = new double[] { subnetCenter.X + subnetRadius * Math.Cos(radiansBetweenEntities * entityIndex), subnetCenter.Y + subnetRadius * Math.Sin(radiansBetweenEntities * entityIndex) };
+                        entityIndex++;
+                    }
+
+                    subnetIndex++;
+                });
+            }
+
             // Generate graph JSON
             var graphClass = new
             {
                 Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
-                Interactions = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target })
+                Interactions = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target }),
+                EntityPositions = subnetEntityPositions
             };
 
             return JsonConvert.SerializeObject(graphClass);
