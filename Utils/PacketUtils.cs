@@ -1,7 +1,7 @@
 ﻿using PcapDotNet.Packets;
 using PcapDotNet.Packets.IpV4;
 
-namespace dotnet_reactjs.Utils
+namespace NetworkAnalyzer.Utils
 {
     public static class PacketUtils
     {

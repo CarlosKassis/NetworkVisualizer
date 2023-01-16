@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 
 // Code was taken from http://theinstructionlimit.com/fast-uniform-poisson-disk-sampling-in-c
-namespace dotnet_reactjs.Utils
+namespace NetworkAnalyzer.Utils
 {
     // Adapated from java source by Herman Tulleken
     // http://www.luma.co.za/labs/2008/02/27/poisson-disk-sampling/

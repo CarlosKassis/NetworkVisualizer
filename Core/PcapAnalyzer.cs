@@ -1,17 +1,20 @@
 ﻿
 
-namespace dotnet_reactjs.Core
+namespace NetworkAnalyzer.Core
 {
     using Newtonsoft.Json;
     using PcapDotNet.Core;
     using PcapDotNet.Packets;
     using QuikGraph;
     using System.Collections.Concurrent;
-    using dotnet_reactjs.Utils;
+    using NetworkAnalyzer.Utils;
     using System.Collections.Generic;
     using System.Numerics;
     using UAParser;
     using PcapDotNet.Packets.Dns;
+    using Utils.Dhcp;
+    using NetworkAnalyzer.Utils.Dhcp.Options;
+    using NetworkAnalyzer.Utils.Dhcp.Enums;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -21,14 +24,21 @@ namespace dotnet_reactjs.Core
         None
     };
 
-    class InteractionData
+    // Extracting Mac from certain sources has more priority than other sources
+    // The lower, the more priority it has
+    public enum MacSetPriority
     {
-
-    }
+        FromARP,
+        FromDHCP,
+        None
+    };
 
     class ConcurrentEntityData
     {
-        private OsSetPriority _priority = OsSetPriority.None;
+        private OsSetPriority _osSetPriority = OsSetPriority.None;
+        private MacSetPriority _macSetPriority = MacSetPriority.None;
+
+
         private object _lock = new object();
 
         public readonly HashSet<string> Services = new HashSet<string>();
@@ -50,17 +60,24 @@ namespace dotnet_reactjs.Core
 
         public void SetOs(string os, OsSetPriority priority)
         {
-            if (os == null)
-            {
-                return;
-            }
-
             lock (_lock)
             {
-                if (priority < _priority)
+                if (priority <= _osSetPriority)
                 {
-                    _priority = priority;
+                    _osSetPriority = priority;
                     Os = os;
+                }
+            }
+        }
+
+        public void SetMac(string mac, MacSetPriority macSetPriority)
+        {
+            lock (_lock)
+            {
+                if (macSetPriority <= _macSetPriority)
+                {
+                    _macSetPriority = macSetPriority;
+                    Mac = mac;
                 }
             }
         }
@@ -71,6 +88,24 @@ namespace dotnet_reactjs.Core
             {
                 Hostname = hostname;
             }
+        }
+
+        public void SetDomain(string domain)
+        {
+            lock (_lock)
+            {
+                Domain = domain;
+            }
+        }
+    }
+
+    class ConcurrentSubnetData
+    {
+        public string? Domain { get; private set; }
+
+        public ConcurrentSubnetData(string domain = null)
+        {
+            Domain = domain;
         }
     }
 
@@ -113,6 +148,7 @@ namespace dotnet_reactjs.Core
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
+        private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string _filePath;
 
@@ -281,6 +317,109 @@ namespace dotnet_reactjs.Core
             TryExtractDeviceProvidedService(packet);
             TryExtractOsFromHttp(packet);
             TryExtractHostnameFromDnsResponse(packet);
+            TryExtractDHCPInfo(packet);
+        }
+
+        private void AssertEntityPresentOrAdd(string ip)
+        {
+            _entities.TryAdd(ip, new ConcurrentEntityData(ip));
+        }
+
+        private void TryExtractDHCPInfo(Packet packet)
+        {
+            if (!packet.IsUdp())
+            {
+                return;
+            }
+
+            // Return if not DHCP message from DHCP server
+            if (packet.Ethernet.IpV4.Udp.SourcePort != 67)
+            {
+                return;
+            }
+
+            var udpBytes = packet.Ethernet.IpV4.Udp.Payload?.ToMemoryStream()?.ToArray();
+            if (udpBytes == null)
+            {
+                return;
+            }
+
+            var dhcp = DHCPPacketParser.Parse(udpBytes);
+            if (dhcp == null)
+            {
+                return;
+            }
+
+            if (dhcp.op != MessageOpCode.BOOTREPLY)
+            {
+                return;
+            }
+
+            if (!dhcp.options.Any(x => x is DHCPOptionDHCPMessageType type && type.MessageType == DHCPMessageType.DHCPACK))
+            {
+                return;
+            }
+
+            var subnetMaskBytes = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
+            if (subnetMaskBytes == null)
+            {
+                return;
+            }
+
+            var dhcpServerIp = ((DHCPOptionDHCPServerIdentifier)dhcp.options.FirstOrDefault(x => x is DHCPOptionDHCPServerIdentifier mask))?.ServerIdentifier;
+            byte[] subnetIpBytes;
+            if (dhcp.ciaddr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                // AND client IP and subnet mask to get subnet address
+                subnetIpBytes = dhcp.ciaddr.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+            }
+            else if (dhcpServerIp != null && dhcpServerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                // AND DHCP server IP and subnet mask to get subnet address
+                subnetIpBytes = dhcpServerIp.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+            }
+            else
+            {
+                // Couldn't get a reliable ip info from DHCP packet
+                return;
+            }
+
+            var subnetIp = BitConverter.ToString(subnetIpBytes).Replace("-", string.Empty);
+            var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
+            _subnets.TryAdd(subnetIp, new ConcurrentSubnetData(subnetDomain));
+
+            var routers = ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?
+                .Select(ip =>
+                {
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    {
+                        return ip.ToString();
+                    }
+
+                    return null;
+                })
+                .Where(ip => ip != null)
+                .ToList();
+
+            if (routers != null)
+            {
+                routers.ForEach(router =>
+                {
+
+                });
+            }
+
+            var clientIp = dhcp.ciaddr.ToString();
+            
+            var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
+
+            if (clientIp != null && clientMac != null)
+            {
+                AssertEntityPresentOrAdd(clientIp);
+                _entities[clientIp].SetMac(clientMac, MacSetPriority.FromDHCP);
+            }
+
+            // DO PROCESSING ON DHCP
         }
 
         private void TryExtractHostnameFromDnsResponse(Packet packet)
@@ -400,12 +539,12 @@ namespace dotnet_reactjs.Core
 
             if (!sourceIp.IsMiscIp())
             {
-                _entities.TryAdd(sourceIp, new ConcurrentEntityData(sourceIp));
+                AssertEntityPresentOrAdd(sourceIp);
             }
 
             if (!destinationIp.IsMiscIp())
             {
-                _entities.TryAdd(destinationIp, new ConcurrentEntityData(destinationIp));
+                AssertEntityPresentOrAdd(destinationIp);
             }
         }
 
