@@ -55,7 +55,7 @@ namespace NetworkAnalyzer.Core
             Ip = ip;
 
             var ipParts = ip.Split('.');
-            Subnet = $"{ip[0]}.{ip[1]}.{ip[2]}.0/24";
+            Subnet = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.0/24";
         }
 
         public void SetOs(string os, OsSetPriority priority)
@@ -318,11 +318,40 @@ namespace NetworkAnalyzer.Core
             TryExtractOsFromHttp(packet);
             TryExtractHostnameFromDnsResponse(packet);
             TryExtractDHCPInfo(packet);
+            TryExtractARPInfo(packet);
         }
 
         private void AssertEntityPresentOrAdd(string ip)
         {
             _entities.TryAdd(ip, new ConcurrentEntityData(ip));
+        }
+
+        private void TryExtractARPInfo(Packet packet)
+        {
+            if (!(packet?.Ethernet?.IsValid ?? false))
+            {
+                return;
+            }
+
+            if (!(packet.Ethernet.Arp?.IsValid ?? false))
+            {
+                return;
+            }
+
+            if (packet.Ethernet.Arp.HardwareType != PcapDotNet.Packets.Arp.ArpHardwareType.Ethernet)
+            {
+                return;
+            }
+
+            var senderIp = packet.Ethernet.Arp.SenderProtocolIpV4Address.ToString();
+            var senderMac = AddressUtils.MacBytesToString(packet.Ethernet.Arp.SenderHardwareAddress);
+            if (string.IsNullOrEmpty(senderIp) || string.IsNullOrEmpty(senderMac))
+            {
+                return;
+            }
+
+            AssertEntityPresentOrAdd(senderIp);
+            _entities[senderIp].SetMac(senderMac, MacSetPriority.FromARP);
         }
 
         private void TryExtractDHCPInfo(Packet packet)
@@ -410,10 +439,10 @@ namespace NetworkAnalyzer.Core
             }
 
             var clientIp = dhcp.ciaddr.ToString();
-            
-            var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
 
-            if (clientIp != null && clientMac != null)
+            var clientMac = AddressUtils.MacBytesToString(dhcp.chaddr.GetBytes());
+
+            if (!string.IsNullOrEmpty(clientIp) && !string.IsNullOrEmpty(clientMac))
             {
                 AssertEntityPresentOrAdd(clientIp);
                 _entities[clientIp].SetMac(clientMac, MacSetPriority.FromDHCP);
