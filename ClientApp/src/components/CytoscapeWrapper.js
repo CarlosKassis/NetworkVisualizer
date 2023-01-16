@@ -23,8 +23,8 @@ function CytoscapeWrapper(props) {
     const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
     return (
         <div style={{ width: '100%', backgroundColor: 'FEFEFE' }}>
-            <CytoscapeComponent ref={cyRef} minZoom={0.01} maxZoom={8}
-                elements={props.graphElements.length ? props.graphElements : [defaultElements] }
+            <CytoscapeComponent minZoom={0.01} maxZoom={8} style={{ height: '100%' }}
+                elements={props.graphElements.length ? props.graphElements : [defaultElements]}
                 textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
                     if (initialRender) {
@@ -36,25 +36,25 @@ function CytoscapeWrapper(props) {
                     cy.on('tap', 'node', onNodeClick);
                 }}
                 stylesheet={[
-                {
-                    selector: 'node',
-                    style: {
-                        'label': 'data(label)',
-                        'background-image': 'data(image)',
-                        'background-fit': 'cover',
-                        'background-clip': 'none',
-                        'background-opacity': 0
+                    {
+                        selector: 'node',
+                        style: {
+                            'label': 'data(label)',
+                            'background-image': 'data(image)',
+                            'background-fit': 'cover',
+                            'background-clip': 'none',
+                            'background-opacity': 0
+                        },
                     },
-                },
 
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': '1.5px',
-                        'line-color': '#777'
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': '1.5px',
+                            'line-color': '#777'
+                        }
                     }
-                }
-            ]} />
+                ]} />
         </div>
     );
 }
