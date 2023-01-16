@@ -4,7 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 
-namespace dotnet_reactjs.Utils.Dhcp.Utility.RemoteAgentIdFormats
+namespace NetworkAnalyzer.Utils.Dhcp.Utility.RemoteAgentIdFormats
 {
     public class CiscoRouterTLV
     {

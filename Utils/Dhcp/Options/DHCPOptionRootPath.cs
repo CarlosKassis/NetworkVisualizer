@@ -20,13 +20,13 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 /// SOFTWARE.
 
-using dotnet_reactjs.Utils.Dhcp.Enums;
+using NetworkAnalyzer.Utils.Dhcp.Enums;
 using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace dotnet_reactjs.Utils.Dhcp.Options
+namespace NetworkAnalyzer.Utils.Dhcp.Options
 {
     public class DHCPOptionRootPath : DHCPOption
     {

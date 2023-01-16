@@ -22,7 +22,7 @@
 
 using System;
 
-namespace dotnet_reactjs.Utils.Dhcp.Options.VendorSpecificInformation
+namespace NetworkAnalyzer.Utils.Dhcp.Options.VendorSpecificInformation
 {
     public class DHCPVSIUnknown : DHCPVendorSpecificInformation
     {

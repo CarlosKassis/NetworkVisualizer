@@ -25,7 +25,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace dotnet_reactjs.Utils.Dhcp.Options
+namespace NetworkAnalyzer.Utils.Dhcp.Options
 {
     public class DHCPOptionClassId : DHCPOption
     {

@@ -20,9 +20,9 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 /// SOFTWARE.
 
-using dotnet_reactjs.Utils.Dhcp.Enums;
+using NetworkAnalyzer.Utils.Dhcp.Enums;
 
-namespace dotnet_reactjs.Utils.Dhcp.HardwareAddressTypes
+namespace NetworkAnalyzer.Utils.Dhcp.HardwareAddressTypes
 {
     public abstract class ClientHardwareAddress
     {

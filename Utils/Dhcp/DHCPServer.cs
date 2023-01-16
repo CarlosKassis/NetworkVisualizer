@@ -1,4 +1,4 @@
-﻿using dotnet_reactjs.Utils.Dhcp.Enums;
+﻿using NetworkAnalyzer.Utils.Dhcp.Enums;
 /// The MIT License(MIT)
 /// 
 /// Copyright(c) 2017 Conscia Norway AS
@@ -28,7 +28,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace dotnet_reactjs.Utils.Dhcp
+namespace NetworkAnalyzer.Utils.Dhcp
 {
     public class DHCPServer
     {

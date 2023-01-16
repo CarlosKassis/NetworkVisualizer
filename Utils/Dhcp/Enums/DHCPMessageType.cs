@@ -21,7 +21,7 @@
 /// SOFTWARE.
 
 
-namespace dotnet_reactjs.Utils.Dhcp.Enums
+namespace NetworkAnalyzer.Utils.Dhcp.Enums
 {
     public enum DHCPMessageType
     {

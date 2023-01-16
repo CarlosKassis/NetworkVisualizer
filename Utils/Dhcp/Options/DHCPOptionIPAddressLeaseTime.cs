@@ -24,7 +24,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace dotnet_reactjs.Utils.Dhcp.Options
+namespace NetworkAnalyzer.Utils.Dhcp.Options
 {
     public class DHCPOptionIPAddressLeaseTime : DHCPOption
     {

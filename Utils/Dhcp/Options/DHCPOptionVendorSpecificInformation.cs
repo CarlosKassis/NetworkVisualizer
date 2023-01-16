@@ -1,4 +1,4 @@
-﻿using dotnet_reactjs.Utils.Dhcp.Enums;
+﻿using NetworkAnalyzer.Utils.Dhcp.Enums;
 /// The MIT License(MIT)
 /// 
 /// Copyright(c) 2017 Conscia Norway AS
@@ -21,7 +21,7 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 /// SOFTWARE.
 
-using dotnet_reactjs.Utils.Dhcp.Options.VendorSpecificInformation;
+using NetworkAnalyzer.Utils.Dhcp.Options.VendorSpecificInformation;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,7 +29,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
-namespace dotnet_reactjs.Utils.Dhcp.Options
+namespace NetworkAnalyzer.Utils.Dhcp.Options
 {
     // TODO : Full testing. I implemented this just to make sure the structure is in place.
     public class DHCPOptionVendorSpecificInformation : DHCPOption

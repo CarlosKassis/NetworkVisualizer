@@ -1,20 +1,20 @@
 ﻿
 
-namespace dotnet_reactjs.Core
+namespace NetworkAnalyzer.Core
 {
     using Newtonsoft.Json;
     using PcapDotNet.Core;
     using PcapDotNet.Packets;
     using QuikGraph;
     using System.Collections.Concurrent;
-    using dotnet_reactjs.Utils;
+    using NetworkAnalyzer.Utils;
     using System.Collections.Generic;
     using System.Numerics;
     using UAParser;
     using PcapDotNet.Packets.Dns;
     using Utils.Dhcp;
-    using dotnet_reactjs.Utils.Dhcp.Options;
-    using dotnet_reactjs.Utils.Dhcp.Enums;
+    using NetworkAnalyzer.Utils.Dhcp.Options;
+    using NetworkAnalyzer.Utils.Dhcp.Enums;
     using Microsoft.AspNetCore.HttpOverrides;
 
     // Extracting Os from certain sources has more priority than other sources

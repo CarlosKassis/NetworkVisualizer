@@ -1,18 +1,12 @@
-﻿using dotnet_reactjs.Core;
-using Microsoft.AspNetCore.Http;
+﻿using NetworkAnalyzer.Core;
 using Microsoft.AspNetCore.Mvc;
 
-namespace dotnet_reactjs.Controllers;
+namespace NetworkAnalyzer.Controllers;
 
 [ApiController]
 [Route("[controller]")]
 public class NetworkAnalyzerController : ControllerBase
 {
-    private static readonly string[] Summaries = new[]
-    {
-        "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-    };
-
     private readonly ILogger<NetworkAnalyzerController> _logger;
 
     private static readonly string PcapUploadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "PcapUpload");

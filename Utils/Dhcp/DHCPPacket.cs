@@ -20,12 +20,12 @@
 /// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 /// SOFTWARE.
 
-using dotnet_reactjs.Utils.Dhcp.Enums;
-using dotnet_reactjs.Utils.Dhcp.HardwareAddressTypes;
-using dotnet_reactjs.Utils.Dhcp.Options;
+using NetworkAnalyzer.Utils.Dhcp.Enums;
+using NetworkAnalyzer.Utils.Dhcp.HardwareAddressTypes;
+using NetworkAnalyzer.Utils.Dhcp.Options;
 using System.Net;
 
-namespace dotnet_reactjs.Utils.Dhcp
+namespace NetworkAnalyzer.Utils.Dhcp
 {
     public class DHCPPacket
     {

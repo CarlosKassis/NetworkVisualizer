@@ -24,7 +24,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace dotnet_reactjs.Utils.Dhcp.HardwareAddressTypes
+namespace NetworkAnalyzer.Utils.Dhcp.HardwareAddressTypes
 {
     public class GenericClientHardwareAddress : ClientHardwareAddress
     {

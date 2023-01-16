@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 
-namespace dotnet_reactjs.Utils.Dhcp.Utility
+namespace NetworkAnalyzer.Utils.Dhcp.Utility
 {
     class ParserTools
     {

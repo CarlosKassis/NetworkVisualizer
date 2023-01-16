@@ -21,7 +21,7 @@
 /// SOFTWARE.
 
 
-namespace dotnet_reactjs.Utils.Dhcp.Options.VendorSpecificInformation
+namespace NetworkAnalyzer.Utils.Dhcp.Options.VendorSpecificInformation
 {
     public abstract class DHCPVendorSpecificInformation
     {
