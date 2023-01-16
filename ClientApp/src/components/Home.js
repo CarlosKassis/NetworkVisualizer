@@ -44,7 +44,7 @@ function Home() {
                 || element.data.source && !ipStartsWithOne(element.data.source) && !ipStartsWithOne(element.data.target) 
         })*/
 
-        
+
         setGraphElements(elements);
         setFullGraphElements(elements);
         setNeedToRecenter(true);
@@ -111,6 +111,10 @@ function Home() {
         return elements;
     }
 
+    function onFilterGraph(inclusions, exclusions) {
+        //console.log(`${inclusions} +++ ${exclusions}`);
+    }
+
     return (
         <div style={{ fontFamily: 'Arial !important' }}>
             <div className={"container"} >
@@ -124,10 +128,7 @@ function Home() {
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
             }}>
-                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)}
-                style={{
-                    width: '70%'
-                }} />
+                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
                 <div style={{
                     borderColor: '#555',
                     boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',
@@ -139,7 +140,7 @@ function Home() {
                     marginRight: '0px'
                 }}>
                     <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
-                    <GraphFilter />
+                    <GraphFilter onFilterGraph={onFilterGraph} />
                 </div>
             </div>
         </div>
