@@ -15,7 +15,6 @@ namespace NetworkAnalyzer.Core
     using Utils.Dhcp;
     using NetworkAnalyzer.Utils.Dhcp.Options;
     using NetworkAnalyzer.Utils.Dhcp.Enums;
-    using Microsoft.AspNetCore.HttpOverrides;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -25,9 +24,21 @@ namespace NetworkAnalyzer.Core
         None
     };
 
+    // Extracting Mac from certain sources has more priority than other sources
+    // The lower, the more priority it has
+    public enum MacSetPriority
+    {
+        FromARP,
+        FromDHCP,
+        None
+    };
+
     class ConcurrentEntityData
     {
-        private OsSetPriority _priority = OsSetPriority.None;
+        private OsSetPriority _osSetPriority = OsSetPriority.None;
+        private MacSetPriority _macSetPriority = MacSetPriority.None;
+
+
         private object _lock = new object();
 
         public readonly HashSet<string> Services = new HashSet<string>();
@@ -49,26 +60,25 @@ namespace NetworkAnalyzer.Core
 
         public void SetOs(string os, OsSetPriority priority)
         {
-            if (os == null)
-            {
-                return;
-            }
-
             lock (_lock)
             {
-                if (priority < _priority)
+                if (priority <= _osSetPriority)
                 {
-                    _priority = priority;
+                    _osSetPriority = priority;
                     Os = os;
                 }
             }
         }
 
-        public void SetMac(string mac)
+        public void SetMac(string mac, MacSetPriority macSetPriority)
         {
             lock (_lock)
             {
-                Mac = mac;
+                if (macSetPriority <= _macSetPriority)
+                {
+                    _macSetPriority = macSetPriority;
+                    Mac = mac;
+                }
             }
         }
 
@@ -310,6 +320,11 @@ namespace NetworkAnalyzer.Core
             TryExtractDHCPInfo(packet);
         }
 
+        private void AssertEntityPresentOrAdd(string ip)
+        {
+            _entities.TryAdd(ip, new ConcurrentEntityData(ip));
+        }
+
         private void TryExtractDHCPInfo(Packet packet)
         {
             if (!packet.IsUdp())
@@ -397,6 +412,12 @@ namespace NetworkAnalyzer.Core
             var clientIp = dhcp.ciaddr.ToString();
             
             var clientMac = BitConverter.ToString(dhcp.chaddr.GetBytes()).Replace('-', ':');
+
+            if (clientIp != null && clientMac != null)
+            {
+                AssertEntityPresentOrAdd(clientIp);
+                _entities[clientIp].SetMac(clientMac, MacSetPriority.FromDHCP);
+            }
 
             // DO PROCESSING ON DHCP
         }
@@ -518,12 +539,12 @@ namespace NetworkAnalyzer.Core
 
             if (!sourceIp.IsMiscIp())
             {
-                _entities.TryAdd(sourceIp, new ConcurrentEntityData(sourceIp));
+                AssertEntityPresentOrAdd(sourceIp);
             }
 
             if (!destinationIp.IsMiscIp())
             {
-                _entities.TryAdd(destinationIp, new ConcurrentEntityData(destinationIp));
+                AssertEntityPresentOrAdd(destinationIp);
             }
         }
 
