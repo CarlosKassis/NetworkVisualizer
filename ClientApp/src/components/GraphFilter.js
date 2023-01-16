@@ -19,7 +19,9 @@ function GraphFilter(props) {
             <div style={{ padding: '20px' }}>
                 <h4><b>Filter</b></h4>
                 <IpFilter title={"Inclusions"}></IpFilter>
+                <br />
                 <IpFilter title={"Exclusions"}></IpFilter>
+                <br />
                 <button className={"btn-cyber"} style={{
 
                 }}><b>Filter</b></button>

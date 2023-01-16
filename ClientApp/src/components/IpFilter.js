@@ -2,7 +2,7 @@
 
 function IpFilter(props) {
 
-    const [validInput, setValidInput] = useState(false);
+    const [validInput, setValidInput] = useState(true);
 
     return (
         <div>
