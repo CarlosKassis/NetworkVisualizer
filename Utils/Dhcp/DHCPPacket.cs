@@ -23,8 +23,6 @@
 using dotnet_reactjs.Utils.Dhcp.Enums;
 using dotnet_reactjs.Utils.Dhcp.HardwareAddressTypes;
 using dotnet_reactjs.Utils.Dhcp.Options;
-using System;
-using System.Collections.Generic;
 using System.Net;
 
 namespace dotnet_reactjs.Utils.Dhcp

@@ -23,8 +23,8 @@ public class NetworkAnalyzerController : ControllerBase
     }
 
     [HttpPost]
-    [RequestSizeLimit(1_000_000_000)] // 1GB
-    [RequestFormLimits(MultipartBodyLengthLimit = 1_000_000_000)] // 1GB
+    [RequestSizeLimit(1_000_000_000)] // ~1GB
+    [RequestFormLimits(MultipartBodyLengthLimit = 1_000_000_000)] // ~1GB
     public async Task<IActionResult> UploadFile([FromForm] IFormFile file)
     {
         if (file.Length == 0)
