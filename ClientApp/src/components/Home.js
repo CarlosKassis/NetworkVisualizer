@@ -3,6 +3,7 @@ import FileUploadSingle from './FileUpload'
 import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
+import './Cyber.css'
 
 function Home() {
 
@@ -43,6 +44,7 @@ function Home() {
                 || element.data.source && !ipStartsWithOne(element.data.source) && !ipStartsWithOne(element.data.target) 
         })*/
 
+        
         setGraphElements(elements);
         setFullGraphElements(elements);
         setNeedToRecenter(true);
@@ -59,7 +61,7 @@ function Home() {
     }
 
     const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null) => {
-        
+
         setIp(ip);
         setHostname(hostname);
         setMac(mac);
@@ -110,15 +112,35 @@ function Home() {
     }
 
     return (
-        <div>
-            <div className={"container"}>
+        <div style={{ fontFamily: 'Arial !important' }}>
+            <div className={"container"} >
                 <h2>Traffic Analysis</h2>
                 <FileUploadSingle onCallback={fileUploadCallback} />
                 <br />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'row', boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)' }}>
-                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
-                <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
+            <div style={{
+                height: '75vh',
+                display: 'flex',
+                flexDirection: 'row',
+                boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
+            }}>
+                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)}
+                style={{
+                    width: '70%'
+                }} />
+                <div style={{
+                    borderColor: '#555',
+                    boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',
+                    width: '30%',
+                    backgroundColor: 'white',
+                    wordWrap: 'break-word',
+                    maxWidth: '400px',
+                    marginLeft: 'auto',
+                    marginRight: '0px'
+                }}>
+                    <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
+                    <GraphFilter />
+                </div>
             </div>
         </div>
     );

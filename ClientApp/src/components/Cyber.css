@@ -1,0 +1,14 @@
+/* Provide sufficient contrast against white background */
+
+.btn-cyber {
+    padding: 2px;
+    padding-left: 15px;
+    padding-right: 15px;
+    background: none;
+    border-radius: 4px;
+    box-shadow: 0px 2px 5px 0 rgb(0 0 0 /30%);
+}
+
+html * {
+
+}
