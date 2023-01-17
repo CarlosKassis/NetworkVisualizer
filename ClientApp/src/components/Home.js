@@ -18,9 +18,72 @@ function Home() {
     const [domain, setDomain] = useState(null);
     const [needToRecenter, setNeedToRecenter] = useState(false);
 
+    const [ipInclusions, setIpInclusions] = useState([]);
+    const [ipExclusions, setIpExclusions] = useState([]);
+    const [subnetInclusions, setSubnetInclusions] = useState([]);
+    const [subnetExclusions, setSubnetExclusions] = useState([]);
+
+
     useEffect(() => {
         setNeedToRecenter(false);
     });
+
+    function ipToInteger(ipStr) {
+        var ip = ipStr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+        if (ip) {
+            return (+ip[1] << 24) + (+ip[2] << 16) + (+ip[3] << 8) + (+ip[4]);
+        }
+
+        return null;
+    }
+
+    function IPmask(maskSize) {
+        return -1 << (32 - maskSize)
+    }
+
+    function onFilterGraph(inclusionString, exclusionString) {
+        var newIpInclusions = [];
+        var newIpExclusions = [];
+        var newSubnetInclusions = [];
+        var newSubnetExclusions = [];
+
+        if (inclusionString !== '') {
+            const inclusions = inclusionString.split(',');
+            for (const inclusion of inclusions) {
+                if (ipToInteger(inclusion) != null) {
+                    // IPv4
+                    newIpInclusions.push(inclusion); // Push IP as string for string comparison
+                    continue;
+                }
+
+                const subnetParts = inclusion.split('/');
+                newSubnetInclusions.push([ipToInteger(subnetParts[0]), Number(subnetParts[1])]) // Push subnet IP and mask by integers for arithmetic comparison
+            }
+        }
+
+        if (exclusionString !== '') {
+            const exclusions = exclusionString.split(',');
+            for (const exclusion of exclusions) {
+                if (ipToInteger(exclusion) != null) {
+                    // IPv4
+                    newIpExclusions.push(exclusion); // Push IP as string for string comparison
+                    continue;
+                }
+
+                const subnetParts = exclusion.split('/');
+                newSubnetExclusions.push([ipToInteger(subnetParts[0]), Number(subnetParts[1])]) // Push subnet IP and mask by integers for arithmetic comparison
+            }
+        }
+
+        setIpInclusions(newIpInclusions);
+        setIpExclusions(newIpExclusions);
+        setSubnetInclusions(newSubnetInclusions);
+        setSubnetExclusions(newSubnetExclusions);
+    }
+
+    function shouldIpBeDisplayedOnGraph(ip) {
+
+    }
 
     const fileUploadCallback = (json) =>
     {
@@ -109,10 +172,6 @@ function Home() {
         }
 
         return elements;
-    }
-
-    function onFilterGraph(inclusions, exclusions) {
-        //console.log(`${inclusions} +++ ${exclusions}`);
     }
 
     return (

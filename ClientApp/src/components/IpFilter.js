@@ -9,18 +9,13 @@ function IpFilter(props) {
     }
 
     function isIPv4(str) {
-        const ipParts = str.split('.');
-        if (ipParts.length != 4) {
+        var ipParts = str.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+        if (!ipParts) {
             return false;
         }
 
         for (const part of ipParts) {
-            if (!isInteger(part)) {
-                return false;
-            }
-
-            const partInt = Number(part);
-            if (partInt < 0 || partInt > 255) {
+            if (part < 0 || part > 255) {
                 return false;
             }
         }

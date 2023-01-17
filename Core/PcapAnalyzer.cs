@@ -198,7 +198,7 @@ namespace NetworkAnalyzer.Core
 
             Dictionary<string, double[]>? subnetEntityPositions = null;
 
-            int maxTries = 10;
+            int maxTries = 20;
             for (int i = 0; i < maxTries; i++)
             {
                 var subnetCircleCenters = UniformPoissonDiskSampler.SampleRectangle(
@@ -209,7 +209,7 @@ namespace NetworkAnalyzer.Core
 
                 if (subnetCircleCenters.Count < subnets.Count)
                 {
-                    viewBoxWidth *= 1.2f;
+                    viewBoxWidth *= 1.1f;
                     continue;
                 }
 
@@ -232,6 +232,11 @@ namespace NetworkAnalyzer.Core
 
                     subnetIndex++;
                 });
+            }
+
+            if (subnetEntityPositions == null)
+            {
+                Console.WriteLine("Failed to generate positions for entities!!!");
             }
 
             // Generate graph JSON
