@@ -1,50 +1,9 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
+import { isIPv4, isIPv4Network } from '../Utils'
 
 function IpFilter(props) {
 
     const [validInput, setValidInput] = useState(true);
-
-    function isInteger(str) {
-        return /^\d+$/.test(str);
-    }
-
-    function isIPv4(str) {
-        var ipParts = str.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-        if (!ipParts) {
-            return false;
-        }
-
-        for (const part of ipParts) {
-            if (part < 0 || part > 255) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    function isIPv4Network(str) {
-        const subnetParts = str.split('/');
-        if (subnetParts.length != 2) {
-            return false;
-        }
-
-        if (!isInteger(subnetParts[1])) {
-            return false;
-        }
-
-        const mask = Number(subnetParts[1]);
-        if (mask < 0 || mask > 32) {
-            return false;
-
-        }
-
-        if (!isIPv4(subnetParts[0])) {
-            return false;
-        }
-
-        return true;
-    }
 
     // Set invalid input state, and signal parent of invalid input
     function setFilterValidity(validity) {
@@ -53,6 +12,7 @@ function IpFilter(props) {
     }
 
     function handleInputChange(event) {
+
         const filterString = event.target.value;
 
         // Empty filter

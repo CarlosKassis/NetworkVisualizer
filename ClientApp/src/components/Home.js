@@ -4,6 +4,7 @@ import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
 import './Cyber.css'
+import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 
 function Home() {
 
@@ -16,73 +17,85 @@ function Home() {
     const [mac, setMac] = useState(null);
     const [hostname, setHostname] = useState(null);
     const [domain, setDomain] = useState(null);
-    const [needToRecenter, setNeedToRecenter] = useState(false);
 
-    const [ipInclusions, setIpInclusions] = useState([]);
-    const [ipExclusions, setIpExclusions] = useState([]);
-    const [subnetInclusions, setSubnetInclusions] = useState([]);
-    const [subnetExclusions, setSubnetExclusions] = useState([]);
+    const [subnetFilter, setSubnetFilter] = useState({ "inclusion":[], "exclusion":[]});
 
-
+    // Filter after changing graph elements
     useEffect(() => {
-        setNeedToRecenter(false);
-    });
-
-    function ipToInteger(ipStr) {
-        var ip = ipStr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-        if (ip) {
-            return (+ip[1] << 24) + (+ip[2] << 16) + (+ip[3] << 8) + (+ip[4]);
-        }
-
-        return null;
-    }
-
-    function IPmask(maskSize) {
-        return -1 << (32 - maskSize)
-    }
+        console.log(fullGraphElements)
+        applyFilteringAndSetGraphElements();
+    }, [fullGraphElements, subnetFilter]);
 
     function onFilterGraph(inclusionString, exclusionString) {
-        var newIpInclusions = [];
-        var newIpExclusions = [];
         var newSubnetInclusions = [];
         var newSubnetExclusions = [];
 
         if (inclusionString !== '') {
             const inclusions = inclusionString.split(',');
-            for (const inclusion of inclusions) {
-                if (ipToInteger(inclusion) != null) {
-                    // IPv4
-                    newIpInclusions.push(inclusion); // Push IP as string for string comparison
-                    continue;
+            for (const filter of inclusions) {
+                if (filter.includes('/')) {
+                    const subnetParts = filter.split('/');
+                    const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
+                    newSubnetInclusions.push([ipToInteger(subnetParts[0]) & maskInteger, maskInteger])
                 }
-
-                const subnetParts = inclusion.split('/');
-                newSubnetInclusions.push([ipToInteger(subnetParts[0]), Number(subnetParts[1])]) // Push subnet IP and mask by integers for arithmetic comparison
+                else {
+                    newSubnetInclusions.push([ipToInteger(filter), ipMaskToInteger(32)]);
+                }
             }
         }
 
+        // TODO: remove code duplication once we figure when does JS use list by reference
         if (exclusionString !== '') {
             const exclusions = exclusionString.split(',');
-            for (const exclusion of exclusions) {
-                if (ipToInteger(exclusion) != null) {
-                    // IPv4
-                    newIpExclusions.push(exclusion); // Push IP as string for string comparison
-                    continue;
-                }
+            for (const filter of exclusions) {
 
-                const subnetParts = exclusion.split('/');
-                newSubnetExclusions.push([ipToInteger(subnetParts[0]), Number(subnetParts[1])]) // Push subnet IP and mask by integers for arithmetic comparison
+                if (filter.includes('/')) {
+                    const subnetParts = filter.split('/');
+                    const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
+                    newSubnetExclusions.push([ipToInteger(subnetParts[0] & maskInteger), maskInteger])
+                }
+                else {
+                    newSubnetExclusions.push([ipToInteger(filter), ipMaskToInteger(32)]);
+                }
             }
         }
 
-        setIpInclusions(newIpInclusions);
-        setIpExclusions(newIpExclusions);
-        setSubnetInclusions(newSubnetInclusions);
-        setSubnetExclusions(newSubnetExclusions);
+        setSubnetFilter({
+            "inclusion": newSubnetInclusions,
+            "exclusion": newSubnetExclusions
+        })
+    }
+
+    function applyFilteringAndSetGraphElements() {
+
+        const filteredGraphElements = fullGraphElements.filter((element) => {
+            if (element.data.source) {
+                return shouldIpBeDisplayedOnGraph(element.data.source) && shouldIpBeDisplayedOnGraph(element.data.target)
+            }
+
+            return shouldIpBeDisplayedOnGraph(element.data.id);
+        });
+
+        setGraphElements(filteredGraphElements);
     }
 
     function shouldIpBeDisplayedOnGraph(ip) {
+        
+        if (subnetFilter.exclusion.length > 0) {
+            const ipInteger = ipToInteger(ip);
+            if (subnetFilter.exclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
+                return false;
+            }
+        }
 
+        if (subnetFilter.inclusion.length > 0) {
+            const ipInteger = ipToInteger(ip);
+            if (!subnetFilter.inclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     const fileUploadCallback = (json) =>
@@ -99,18 +112,9 @@ function Home() {
 
         setEntityToData(entityDictionary);
         setEntityInfoPanelData()
-        var elements = generateGraphElements(networkInfo);
 
-        // A WORKING FILTERING :DDDD
-        /*elements = elements.filter((element) => {
-            return element.data.id && !ipStartsWithOne(element.data.id)
-                || element.data.source && !ipStartsWithOne(element.data.source) && !ipStartsWithOne(element.data.target) 
-        })*/
-
-
-        setGraphElements(elements);
-        setFullGraphElements(elements);
-        setNeedToRecenter(true);
+        const graphElements = generateGraphElements(networkInfo);
+        setFullGraphElements(graphElements);
     }
 
     const writeEntityDataToEntityInfo = (nodeId) =>
@@ -187,7 +191,7 @@ function Home() {
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
             }}>
-                <CytoscapeWrapper needToRecenter={needToRecenter} graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
+                <CytoscapeWrapper graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
                 <div style={{
                     borderColor: '#555',
                     boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',

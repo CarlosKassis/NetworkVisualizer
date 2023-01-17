@@ -6,15 +6,10 @@ function CytoscapeWrapper(props) {
     const [initialRender, setInitialRender] = useState(true)
     const cyRef = useRef(null);
 
+    // Recenter on element change
     useEffect(() => {
-        if (!cyRef.current) {
-            return;
-        }
-
-        if (props.needToRecenter) {
-            cyRef.current.center();
-        }
-    });
+        cyRef.current.center();
+    }, [props.graphElements]);
 
     const onNodeClick = (event) => {
         props.onNodeClick(event.target.data().id);
