@@ -165,7 +165,7 @@ namespace NetworkAnalyzer.Utils
 
     public static class RandomHelper
     {
-        public static readonly Random Random = new Random();
+        public static readonly Random Random = new Random(1000);
     }
 
     public static class MathHelper

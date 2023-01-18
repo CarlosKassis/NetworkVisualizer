@@ -194,7 +194,7 @@ namespace NetworkAnalyzer.Core
         }
     }
 
-    public class PcapAnalyzer
+    public class PcapAnalyzer : IDisposable
     {
         private const int ThreadCount = 10;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
@@ -229,31 +229,53 @@ namespace NetworkAnalyzer.Core
             "DNS", "HTTP", "HTTPS"
         };
 
+        private enum CaptureType
+        {
+            Offline,
+            Live
+        };
+
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
-        private readonly string _filePath;
+        private readonly string? _filePath;
         private readonly Parser _userAgentParser = Parser.GetDefault();
+        private readonly PacketCommunicator _packetCommunicator;
+        private readonly Task _packetCaptureTask;
+        private readonly CaptureType _captureType; // TODO: use inheritance
+
+        // Offline packet capture
         public PcapAnalyzer(string filePath)
         {
             _filePath = filePath;
+
+            // Optimization: add BPF filters
+            OfflinePacketDevice captureFileDevice = new OfflinePacketDevice(_filePath);
+            _packetCommunicator = captureFileDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
+            _packetCaptureTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            _captureType = CaptureType.Offline;
+        }
+
+        // Live packet capture
+        // TODO: add choosing NIC
+        public PcapAnalyzer()
+        {
+            var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
+            var wifiCard = avaliableCaptureDevices.First(device => device.Description.Contains("160MHz")); // Choose my WiFi card
+            _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
+            _packetCaptureTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            _captureType = CaptureType.Live;
         }
 
         public async Task<string> GenerateCytoscapeGraphJson()
         {
-            // Optimization: add BPF filters
-            OfflinePacketDevice selectedDevice = new OfflinePacketDevice(_filePath);
-            using (PacketCommunicator communicator =
-                selectedDevice.Open(65536,                                  // Portion of the packet to capture
-                                                                            // 65536 guarantees that the whole packet will be captured on all the link layers
-                                    PacketDeviceOpenAttributes.Promiscuous, // Promiscuous mode
-                                    1000))                                  // Read timeout
+            if (_captureType == CaptureType.Offline)
             {
-                // Read all packets to memory
-                communicator.ReceivePackets(0, AggregatePacketToMemory);
+                // Wait for file read
+                await _packetCaptureTask;
             }
 
             // Process in parallel
@@ -826,6 +848,11 @@ namespace NetworkAnalyzer.Core
                     _entities[packet.Ethernet.IpV4.Source.ToString()].Services.Add(UdpPortToServiceName[port]);
                 }
             }
+        }
+
+        public void Dispose()
+        {
+            _packetCommunicator?.Dispose();
         }
     }
 }

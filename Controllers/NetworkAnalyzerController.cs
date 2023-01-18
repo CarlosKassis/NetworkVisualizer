@@ -11,6 +11,8 @@ public class NetworkAnalyzerController : ControllerBase
 
     private static readonly string PcapUploadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "PcapUpload");
 
+    private static Guid? _liveCaptureGuid;
+
     public NetworkAnalyzerController(ILogger<NetworkAnalyzerController> logger)
     {
         _logger = logger;
@@ -62,5 +64,21 @@ public class NetworkAnalyzerController : ControllerBase
 
 
         return Content("Oops");
+    }
+
+    private static PcapAnalyzer? _livePcapAnalyzer;
+
+    [HttpGet("startlive")]
+    public IActionResult StartLivePacketCapture()
+    {
+        _livePcapAnalyzer = new PcapAnalyzer();
+        _liveCaptureGuid = Guid.NewGuid();
+        return Content(_liveCaptureGuid.ToString());
+    }
+
+    [HttpGet("tracklive")]
+    public async Task<IActionResult> StartLivePacketCapture(string liveCaptureId)
+    {
+        return Content(await _livePcapAnalyzer.GenerateCytoscapeGraphJson());
     }
 }
