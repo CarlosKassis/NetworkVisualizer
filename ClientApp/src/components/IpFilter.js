@@ -1,15 +1,32 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { isIPv4, isIPv4Network } from '../Utils'
+import Cookies from 'universal-cookie';
 
 function IpFilter(props) {
 
     const [validInput, setValidInput] = useState(true);
+    const [initilized, setInitialized] = useState(false);
+    const filterInput = useRef();
 
     // Set invalid input state, and signal parent of invalid input
     function setFilterValidity(validity) {
         setValidInput(validity);
         props.setFilterValidity(validity);
     }
+
+    // Initialization
+    useEffect(() => {
+        if (initilized) {
+            return;
+        }
+        const cookies = new Cookies();
+        const storedFilter = cookies.get(`filter-${props.filterType}`);
+        if (storedFilter !== undefined) {
+            filterInput.current.value = storedFilter;
+        }
+
+        setInitialized(true);
+    });
 
     function handleInputChange(event) {
 
@@ -47,8 +64,8 @@ function IpFilter(props) {
 
     return (
         <div>
-            <h5><b>{`${props.title}:`}</b></h5>
-            <input onChange={handleInputChange}></input>
+            <h5><b>{`${props.filterType}:`}</b></h5>
+            <input ref={filterInput} onChange={handleInputChange}></input>
             {!validInput && <p style={{ color: '#F77', fontSize: '13px' }}><b>Valid Input: 192.168.1.0/24, 1.1.1.1, ...</b></p>}
         </div>
     );
