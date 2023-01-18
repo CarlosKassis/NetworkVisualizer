@@ -22,17 +22,7 @@ function GraphFilter(props) {
     }
 
     return (
-        <div style={
-            {
-                // TODO: code duplication problem between here and EntityInfo
-                borderColor: '#555',
-                width: '100%',
-                height: '50%',
-                wordWrap: 'break-word',
-                outline: 'solid',
-                outlineColor: '#EEE'
-            }
-        }>
+        <div className={"user-control-part"} style={{ height: '50%' }} >
             <div style={{ padding: '20px' }}>
                 <h4><b>Filter</b></h4>
                 <IpFilter filterType={"Inclusions"} onChangeValidInput={(str) => setInclusionString(str)} setFilterValidity={(validity) => setFilterValidity(validity)}></IpFilter>
