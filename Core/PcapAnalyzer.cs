@@ -1,5 +1,7 @@
 ﻿
 
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+
 namespace NetworkAnalyzer.Core
 {
     using Newtonsoft.Json;
@@ -32,6 +34,17 @@ namespace NetworkAnalyzer.Core
         None
     };
 
+    // Need to always sync this with frontend enums
+    // Lower values get higher priority
+    public enum EntityType
+    {
+        Gateway,
+        DHCP,
+        DNS,
+        Server,
+        Computer
+    };
+
     class ConcurrentEntityData
     {
         private OsSetPriority _osSetPriority = OsSetPriority.None;
@@ -46,11 +59,13 @@ namespace NetworkAnalyzer.Core
         public string? Domain { get; private set; }
         public string? Mac { get; private set; }
         public string? Os { get; private set; }
-        public string? Type = "Computer";
         public string? Subnet { get; private set; }
+        public EntityType Type { get; private set; }
 
-        public ConcurrentEntityData(string ip)
+
+    public ConcurrentEntityData(string ip)
         {
+            Type = EntityType.Computer;
             Ip = ip;
 
             var ipParts = ip.Split('.');
@@ -96,13 +111,34 @@ namespace NetworkAnalyzer.Core
                 Domain = domain;
             }
         }
+
+        public void SetTypeAndMarkAvailableServices(EntityType type)
+        {
+            lock (_lock)
+            {
+                if (type == EntityType.DNS)
+                {
+                    Services.Add("DNS");
+                }
+
+                if (type == EntityType.Gateway)
+                {
+                    Services.Add("Gateway");
+                }
+
+                if (type < Type)
+                {
+                    Type = type;
+                }
+            }
+        }
     }
 
     class ConcurrentSubnetData
     {
         public string? Domain { get; private set; }
 
-        public ConcurrentSubnetData(string domain = null)
+        public ConcurrentSubnetData(string? domain = null)
         {
             Domain = domain;
         }
@@ -238,7 +274,8 @@ namespace NetworkAnalyzer.Core
             {
                 Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
                 Interactions = _interactions.Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
-                EntityPositions = subnetEntityPositions
+                EntityPositions = subnetEntityPositions,
+                Subnets = _subnets.Select(kvp => new object[] { kvp.Key, kvp.Value })
             };
 
             return JsonConvert.SerializeObject(graphClass);
@@ -268,14 +305,10 @@ namespace NetworkAnalyzer.Core
                             break;
                         }
 
-                        // Check if entity provides services that are server-like
-                        foreach (var service in entities[i].Value.Services)
+                        if (entities[i].Value.Services.Any(service => ServicesThatMakeYouAServer.Contains(service)))
                         {
-                            if (ServicesThatMakeYouAServer.Contains(service))
-                            {
-                                entities[i].Value.Type = "Server";
-                                break;
-                            }
+                            // Entity provides services that are server-like
+                            entities[i].Value.SetTypeAndMarkAvailableServices(EntityType.Server);
                         }
                     }
                 });
@@ -315,7 +348,7 @@ namespace NetworkAnalyzer.Core
             TryExtractInteraction(packet);
             TryExtractDeviceProvidedService(packet);
             TryExtractOsFromHttp(packet);
-            TryExtractHostnameFromDnsResponse(packet);
+            TryExtractDnsInfo(packet);
             TryExtractDHCPInfo(packet);
             TryExtractARPInfo(packet);
         }
@@ -388,23 +421,29 @@ namespace NetworkAnalyzer.Core
                 return;
             }
 
-            var subnetMaskBytes = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
-            if (subnetMaskBytes == null)
+            var subnetMaskAddress = ((DHCPOptionSubnetMask)dhcp.options.FirstOrDefault(x => x is DHCPOptionSubnetMask mask))?.SubnetMask;
+            if (subnetMaskAddress == null)
             {
                 return;
             }
 
+            // Get DHCP server and subnet info
             var dhcpServerIp = ((DHCPOptionDHCPServerIdentifier)dhcp.options.FirstOrDefault(x => x is DHCPOptionDHCPServerIdentifier mask))?.ServerIdentifier;
+            if (dhcpServerIp == null)
+            {
+                return;
+            }
+
             byte[] subnetIpBytes;
             if (dhcp.ciaddr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
             {
                 // AND client IP and subnet mask to get subnet address
-                subnetIpBytes = dhcp.ciaddr.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+                subnetIpBytes = dhcp.ciaddr.GetAddressBytes().Zip(subnetMaskAddress.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
             }
             else if (dhcpServerIp != null && dhcpServerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
             {
                 // AND DHCP server IP and subnet mask to get subnet address
-                subnetIpBytes = dhcpServerIp.GetAddressBytes().Zip(subnetMaskBytes.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
+                subnetIpBytes = dhcpServerIp.GetAddressBytes().Zip(subnetMaskAddress.GetAddressBytes(), (first, second) => (byte)(first & second)).ToArray();
             }
             else
             {
@@ -412,35 +451,43 @@ namespace NetworkAnalyzer.Core
                 return;
             }
 
-            var subnetIp = BitConverter.ToString(subnetIpBytes).Replace("-", string.Empty);
-            var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
-            _subnets.TryAdd(subnetIp, new ConcurrentSubnetData(subnetDomain));
+            // Add DHCP server info
+            string dhcpServerIpStr = dhcpServerIp.ToString();
+            AssertEntityPresentOrAdd(dhcpServerIpStr);
+            _entities[dhcpServerIpStr].SetTypeAndMarkAvailableServices(EntityType.DHCP);
 
-            var routers = ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?
-                .Select(ip =>
+            // Add subnet to gathered subnets
+            var subnet = $"{AddressUtils.IpBytesToString(subnetIpBytes)}/{AddressUtils.MaskAddressToMaskNumber(subnetMaskAddress)}";
+            var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
+            _subnets.TryAdd(subnet, new ConcurrentSubnetData(subnetDomain));
+
+            // Add routers info`
+            ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?
+                .ForEach(ip =>
                 {
                     if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                     {
-                        return ip.ToString();
+                        var routerIp = ip.ToString();
+                        AssertEntityPresentOrAdd(routerIp);
+                        _entities[routerIp].SetTypeAndMarkAvailableServices(EntityType.Gateway);
                     }
-
-                    return null;
-                })
-                .Where(ip => ip != null)
-                .ToList();
-
-            if (routers != null)
-            {
-                routers.ForEach(router =>
-                {
-
                 });
-            }
 
+            // Add DNS server info
+            ((DHCPOptionDomainNameServer)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainNameServer mask))?.DomainNameServers?.ForEach(dnsServerIp =>
+            {
+                if (dnsServerIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    string dnsServerIpStr = dnsServerIp.ToString();
+                    AssertEntityPresentOrAdd(dnsServerIpStr);
+                    _entities[dnsServerIpStr].SetTypeAndMarkAvailableServices(EntityType.DNS);
+                }
+            });
+
+
+            // Add client info
             var clientIp = dhcp.ciaddr.ToString();
-
             var clientMac = AddressUtils.MacBytesToString(dhcp.chaddr.GetBytes());
-
             if (!string.IsNullOrEmpty(clientIp) && !string.IsNullOrEmpty(clientMac))
             {
                 AssertEntityPresentOrAdd(clientIp);
@@ -450,13 +497,14 @@ namespace NetworkAnalyzer.Core
             // DO PROCESSING ON DHCP
         }
 
-        private void TryExtractHostnameFromDnsResponse(Packet packet)
+        private void TryExtractDnsInfo(Packet packet)
         {
             if (!packet.IsUdp())
             {
                 return;
             }
 
+            // 53 for DNS, 5353 for mDNS
             if (packet.Ethernet.IpV4.Udp.SourcePort != 53 && packet.Ethernet.IpV4.Udp.SourcePort != 5353)
             {
                 return;
@@ -471,6 +519,12 @@ namespace NetworkAnalyzer.Core
             if (!dns.IsResponse)
             {
                 return;
+            }
+
+            // Add DNS server info
+            if (packet.Ethernet.IpV4.Udp.SourcePort == 53)
+            {
+
             }
 
             if (dns.Answers == null)
@@ -634,3 +688,4 @@ namespace NetworkAnalyzer.Core
     }
 }
 
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.

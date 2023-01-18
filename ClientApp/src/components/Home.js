@@ -12,8 +12,17 @@ function Home() {
     const [fullGraphElements, setFullGraphElements] = useState([]);
     const [entityToData, setEntityToData] = useState(null)
 
-    const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null });
+    const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion":[], "exclusion":[]});
+
+    const EntityType = 
+    {
+        'Gateway': 0,
+        'DHCP': 1,
+        'DNS': 2,
+        'Server': 3,
+        'Computer': 4
+    };
 
     // Filter after changing graph elements
     useEffect(() => {
@@ -114,11 +123,11 @@ function Home() {
             return;
         }
 
-        setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain);
+        setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain, entityData.Services.join(','));
     }
 
-    const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null) => {
-        setEntityInfo({ "ip": ip, "hostname": hostname, "mac": mac, "os": os, "domain": domain })
+    const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null, services = null) => {
+        setEntityInfo({ "ip": ip, "hostname": hostname, "mac": mac, "os": os, "domain": domain, "services": services })
     }
 
     // TODO: move to a class
@@ -146,11 +155,23 @@ function Home() {
             // Figure icon
             let icon = null;
             // TODO: use enums
-            if (!entityData.Type || entityData.Type === "Computer") {
+            if (entityData.Type === null || entityData.Type === EntityType.Computer)
+            {
                 icon = '/computer.png';
-            } else if (entityData.Type === "Server") {
+            }
+            else if (entityData.Type === EntityType.Gateway)
+            {
+                icon = '/gateway.png';
+            }
+            else if (entityData.Type === EntityType.DHCP) {
+                icon = '/dhcp.png';
+            }
+            else if (entityData.Type === EntityType.Server)
+            {
                 icon = '/server.png';
-            } else {
+            }
+            else
+            {
                 icon = '/iot.png';
             }
 
@@ -192,7 +213,7 @@ function Home() {
                     marginLeft: 'auto',
                     marginRight: '0px'
                 }}>
-                    <EntityInfo ip={entityInfo["ip"]} hostname={entityInfo["hostname"]} os={entityInfo["os"]} mac={entityInfo["mac"]} domain={entityInfo["domain"]} />
+                    <EntityInfo entityInfo={entityInfo} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
                 </div>
             </div>
