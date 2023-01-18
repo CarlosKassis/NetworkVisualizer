@@ -17,12 +17,14 @@ namespace NetworkAnalyzer.Core
     using NetworkAnalyzer.Utils.Dhcp.Options;
     using NetworkAnalyzer.Utils.Dhcp.Enums;
     using System.Net;
+    using System.Text;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
     public enum OsSetPriority
     {
         FromHttpRequest,
+        FromSSDP,
         None
     };
 
@@ -72,7 +74,7 @@ namespace NetworkAnalyzer.Core
         public EntityType Type { get; private set; }
 
 
-    public ConcurrentEntityData(string ip)
+        public ConcurrentEntityData(string ip)
         {
             Type = EntityType.Computer;
             Ip = ip;
@@ -83,6 +85,11 @@ namespace NetworkAnalyzer.Core
 
         public void SetOs(string os, OsSetPriority priority)
         {
+            if (os == null)
+            {
+                return;
+            }
+
             lock (_lock)
             {
                 if (priority <= _osSetPriority)
@@ -95,6 +102,11 @@ namespace NetworkAnalyzer.Core
 
         public void SetMac(string mac, MacSetPriority macSetPriority)
         {
+            if (mac == null)
+            {
+                return;
+            }
+
             lock (_lock)
             {
                 if (macSetPriority <= _macSetPriority)
@@ -107,17 +119,14 @@ namespace NetworkAnalyzer.Core
 
         public void SetHostname(string hostname)
         {
+            if (hostname == null)
+            {
+                return;
+            }
+
             lock (_lock)
             {
                 Hostname = hostname;
-            }
-        }
-
-        public void SetDomain(string domain)
-        {
-            lock (_lock)
-            {
-                Domain = domain;
             }
         }
 
@@ -144,6 +153,11 @@ namespace NetworkAnalyzer.Core
 
         public void SetDomain(string domain, DomainSetPriority domainSetPriority)
         {
+            if (domain == null)
+            {
+                return;
+            }
+
             lock (_lock)
             {
                 if (domainSetPriority <= _domainSetPriority)
@@ -152,6 +166,12 @@ namespace NetworkAnalyzer.Core
                     Domain = domain;
                 }
             }
+        }
+
+        // Check if entity IP address is the subnet broadcast address
+        public bool IsABroadcastAddress()
+        {
+            return IPNetwork.Parse(Subnet).Broadcast.Equals(IPAddress.Parse(Ip));
         }
     }
 
@@ -216,7 +236,7 @@ namespace NetworkAnalyzer.Core
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string _filePath;
-
+        private readonly Parser _userAgentParser = Parser.GetDefault();
         public PcapAnalyzer(string filePath)
         {
             _filePath = filePath;
@@ -302,8 +322,15 @@ namespace NetworkAnalyzer.Core
             // Generate graph JSON
             var graphClass = new
             {
-                Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
-                Interactions = _interactions.Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
+                Entities = _entities
+                .Where(kvp => !kvp.Value.IsABroadcastAddress())
+                .Select(kvp => new object[] { kvp.Key, kvp.Value }),
+
+                Interactions = _interactions
+                .Where(interaction => _entities.TryGetValue(interaction.Key.Item1, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
+                .Where(interaction => _entities.TryGetValue(interaction.Key.Item2, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
+                .Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
+
                 EntityPositions = subnetEntityPositions,
                 Subnets = _subnets.Select(kvp => new object[] { kvp.Key, kvp.Value })
             };
@@ -387,6 +414,84 @@ namespace NetworkAnalyzer.Core
             TryExtractDnsInfo(packet);
             TryExtractDHCPInfo(packet);
             TryExtractARPInfo(packet);
+            TryExtractSSDPInfo(packet);
+        }
+
+        private string? TryGetSourceIpFromSSDPPayload(string userAgent)
+        {
+            int httpIndex = userAgent.IndexOf("http://");
+            if (httpIndex == -1)
+            {
+                return null;
+            }
+
+            int endpointStringIndex = httpIndex + "http://".Length;
+            if (endpointStringIndex >= userAgent.Length)
+            {
+                return null;
+            }
+
+            string endpointUntilEndOfUserAgent = userAgent.Substring(endpointStringIndex);
+            var parts = endpointUntilEndOfUserAgent.Split(':');
+            if (parts.Length <= 1)
+            {
+                return null;
+            }
+
+            if (!IPAddress.TryParse(parts[0], out IPAddress? endpointIp) || endpointIp.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                return null;
+            }
+
+            return endpointIp.ToString();
+        }
+
+        private void TryExtractSSDPInfo(Packet packet)
+        {
+            // Port 1900 is for SSDP
+            if (!packet.IsUdp() || packet.Ethernet.IpV4.Udp.SourcePort != 1900 && packet.Ethernet.IpV4.Udp.DestinationPort != 1900)
+            {
+                return;
+            }
+
+
+            string payload = Encoding.ASCII.GetString(packet.Ethernet.IpV4.Udp.Payload.Select(b => b).ToArray());
+            if (payload == null)
+            {
+                return;
+            }
+
+            string sourceIp;
+            if (packet.Ethernet.IpV4.Source.IsMiscIp())
+            {
+                sourceIp = TryGetSourceIpFromSSDPPayload(payload);
+                // Is there a purpose if there's no IP?
+                // Is there a purpose to anything?
+                if (sourceIp == null)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                sourceIp = packet.Ethernet.IpV4.Source.ToString();
+            }
+
+            try
+            {
+                ClientInfo clientInfo = _userAgentParser.Parse(payload);
+                if (clientInfo == null)
+                {
+                    return;
+                }
+
+                AssertEntityPresentOrAdd(sourceIp);
+                var entityData = _entities[sourceIp];
+                entityData.SetOs(clientInfo.OS.ToString(), OsSetPriority.FromSSDP);
+            }
+            catch
+            {
+            }
         }
 
         private void AssertEntityPresentOrAdd(string ip)

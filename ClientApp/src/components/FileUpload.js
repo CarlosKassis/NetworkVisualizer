@@ -21,6 +21,7 @@ function FileUploadSingle(props) {
             xhr.open('POST', 'networkanalyzer');
 
             xhr.onload = () => {
+                // TODO: check response status
                  props.onCallback(xhr.responseText)
             };
 
