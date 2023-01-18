@@ -12,53 +12,39 @@ function Home() {
     const [fullGraphElements, setFullGraphElements] = useState([]);
     const [entityToData, setEntityToData] = useState(null)
 
-    const [ip, setIp] = useState(null);
-    const [os, setOs] = useState(null);
-    const [mac, setMac] = useState(null);
-    const [hostname, setHostname] = useState(null);
-    const [domain, setDomain] = useState(null);
-
+    const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion":[], "exclusion":[]});
 
     // Filter after changing graph elements
     useEffect(() => {
-        console.log(fullGraphElements)
         applyFilteringAndSetGraphElements();
     }, [fullGraphElements, subnetFilter]);
 
+    function tryFillIpFiltersFromString(filterList, filterString) {
+        if (filterString === '') {
+            return;
+        }
+
+        const filters = filterString.split(',');
+        for (const filter of filters) {
+            if (filter.includes('/')) {
+                const subnetParts = filter.split('/');
+                const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
+                filterList.push([ipToInteger(subnetParts[0]) & maskInteger, maskInteger])
+            }
+            else {
+                filterList.push([ipToInteger(filter), ipMaskToInteger(32)]);
+            }
+        }
+    }
+
     function onFilterGraph(inclusionString, exclusionString) {
+
         var newSubnetInclusions = [];
         var newSubnetExclusions = [];
 
-        if (inclusionString !== '') {
-            const inclusions = inclusionString.split(',');
-            for (const filter of inclusions) {
-                if (filter.includes('/')) {
-                    const subnetParts = filter.split('/');
-                    const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
-                    newSubnetInclusions.push([ipToInteger(subnetParts[0]) & maskInteger, maskInteger])
-                }
-                else {
-                    newSubnetInclusions.push([ipToInteger(filter), ipMaskToInteger(32)]);
-                }
-            }
-        }
-
-        // TODO: remove code duplication once we figure when does JS use list by reference
-        if (exclusionString !== '') {
-            const exclusions = exclusionString.split(',');
-            for (const filter of exclusions) {
-
-                if (filter.includes('/')) {
-                    const subnetParts = filter.split('/');
-                    const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
-                    newSubnetExclusions.push([ipToInteger(subnetParts[0] & maskInteger), maskInteger])
-                }
-                else {
-                    newSubnetExclusions.push([ipToInteger(filter), ipMaskToInteger(32)]);
-                }
-            }
-        }
+        tryFillIpFiltersFromString(newSubnetInclusions, inclusionString);
+        tryFillIpFiltersFromString(newSubnetExclusions, exclusionString);
 
         setSubnetFilter({
             "inclusion": newSubnetInclusions,
@@ -123,17 +109,16 @@ function Home() {
             return;
         }
 
-        let entityData = entityToData[nodeId];
+        var entityData = entityToData[nodeId];
+        if (entityData === undefined) {
+            return;
+        }
+
         setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain);
     }
 
     const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null) => {
-
-        setIp(ip);
-        setHostname(hostname);
-        setMac(mac);
-        setOs(os);
-        setDomain(domain);
+        setEntityInfo({ "ip": ip, "hostname": hostname, "mac": mac, "os": os, "domain": domain })
     }
 
     // TODO: move to a class
@@ -143,6 +128,10 @@ function Home() {
 
         for (const entity of networkInfo.Entities)
         {
+            if (entity[0] === null || entity[1] === null) {
+                continue;
+            }
+
             let entityIp = entity[0]
             let entityData = entity[1];
             let x = 0;
@@ -178,6 +167,7 @@ function Home() {
         return elements;
     }
 
+
     return (
         <div style={{ fontFamily: 'Arial !important' }}>
             <div className={"container"} >
@@ -191,7 +181,7 @@ function Home() {
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
             }}>
-                <CytoscapeWrapper graphElements={graphElements} onNodeClick={(e) => writeEntityDataToEntityInfo(e)} />
+                <CytoscapeWrapper graphElements={graphElements} onNodeClick={writeEntityDataToEntityInfo} />
                 <div style={{
                     borderColor: '#555',
                     boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',
@@ -202,7 +192,7 @@ function Home() {
                     marginLeft: 'auto',
                     marginRight: '0px'
                 }}>
-                    <EntityInfo ip={ip} hostname={hostname} os={os} mac={mac} domain={domain} />
+                    <EntityInfo ip={entityInfo["ip"]} hostname={entityInfo["hostname"]} os={entityInfo["os"]} mac={entityInfo["mac"]} domain={entityInfo["domain"]} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
                 </div>
             </div>

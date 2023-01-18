@@ -5,7 +5,6 @@ namespace NetworkAnalyzer.Core
     using Newtonsoft.Json;
     using PcapDotNet.Core;
     using PcapDotNet.Packets;
-    using QuikGraph;
     using System.Collections.Concurrent;
     using NetworkAnalyzer.Utils;
     using System.Collections.Generic;
@@ -185,11 +184,6 @@ namespace NetworkAnalyzer.Core
 
         private string GenerateCytoscapeGraphJsonFromAnalysis()
         {
-            var edges = _interactions.Select(interaction => new UndirectedEdge<string>(interaction.Key.Item1, interaction.Key.Item2)).ToList();
-
-            var networkGraph = new UndirectedGraph<string, UndirectedEdge<string>>();
-            networkGraph.AddVerticesAndEdgeRange(edges);
-
             // Generate circle coordinates for subnets
             var subnets = _entities.GroupBy(entity => entity.Value.Subnet).ToList();
             float maxSubnetCircleRadius = SubnetCircleRadiusOnGraph(subnets.Select(subnet => subnet.Count()).Max());
@@ -243,7 +237,7 @@ namespace NetworkAnalyzer.Core
             var graphClass = new
             {
                 Entities = _entities.Select(kvp => new object[] { kvp.Key, kvp.Value }),
-                Interactions = networkGraph.Edges.Select(edge => new string[] { edge.Source, edge.Target }),
+                Interactions = _interactions.Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
                 EntityPositions = subnetEntityPositions
             };
 

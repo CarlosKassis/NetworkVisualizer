@@ -1,6 +1,5 @@
 
 export function ipToInteger(ipStr) {
-    console.log(ipStr);
     var ip = ipStr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
     if (ip) {
         return (+ip[1] << 24) + (+ip[2] << 16) + (+ip[3] << 8) + (+ip[4]);
@@ -10,6 +9,10 @@ export function ipToInteger(ipStr) {
 }
 
 export function ipMaskToInteger(maskSize) {
+    if (maskSize === 0) {
+        return 0;
+    }
+
     return -1 << (32 - maskSize)
 }
 
