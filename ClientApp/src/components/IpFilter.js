@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { isIPv4, isIPv4Network } from '../Utils'
-import Cookies from 'universal-cookie';
+import { getStoredFilter, isValidFilter } from '../Utils'
 
 function IpFilter(props) {
 
@@ -8,58 +7,41 @@ function IpFilter(props) {
     const [initilized, setInitialized] = useState(false);
     const filterInput = useRef();
 
-    // Set invalid input state, and signal parent of invalid input
-    function setFilterValidity(validity) {
-        setValidInput(validity);
-        props.setFilterValidity(validity);
-    }
 
     // Initialization
     useEffect(() => {
         if (initilized) {
             return;
         }
-        const cookies = new Cookies();
-        const storedFilter = cookies.get(`filter-${props.filterType}`);
-        if (storedFilter !== undefined) {
-            filterInput.current.value = storedFilter;
-        }
 
         setInitialized(true);
-    });
+
+        const storedFilter = getStoredFilter(props.filterType);
+        if (storedFilter !== null) {
+            if (isValidFilter(storedFilter)) {
+                filterInput.current.value = storedFilter;
+                props.onChangeValidInput(storedFilter);
+                setValidInput(true);
+                return;
+            }
+
+            setValidInput(false);
+            return;
+        }
+
+        setValidInput(true);
+    }, [initilized]);
 
     function handleInputChange(event) {
 
         const filterString = event.target.value;
-
-        // Empty filter
-        if (filterString === '') {
+        if (isValidFilter(filterString)) {
             props.onChangeValidInput(filterString);
-            setFilterValidity(true);
+            setValidInput(true);
             return;
         }
 
-        const filters = filterString.split(',');
-        for (const filter of filters) {
-            // IPv4
-            if (isIPv4(filter)) {
-                continue
-            }
-
-            // Network
-            if (isIPv4Network(filter)) {
-                continue;
-            }
-
-            // Invalid input
-            setFilterValidity(false);
-            return false;
-        }
-
-        // Valid input
-        props.onChangeValidInput(filterString);
-        setFilterValidity(true);
-        return true;
+        setValidInput(false);
     }
 
     return (

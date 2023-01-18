@@ -1,3 +1,4 @@
+import Cookies from 'universal-cookie';
 
 export function ipToInteger(ipStr) {
     var ip = ipStr.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
@@ -60,4 +61,30 @@ export function isIPv4Network(str) {
 
 export function isIpInSubnet(ipInteger, subnetInteger, maskInteger) {
     return (ipInteger & maskInteger) === (subnetInteger & maskInteger);
+}
+
+export function isValidFilter(filterString) {
+    // Empty filter
+    if (filterString === '') {
+        return true;
+    }
+
+    const filters = filterString.split(',');
+    for (const filter of filters) {
+        if (!isIPv4(filter) && !isIPv4Network(filter)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export function getStoredFilter(filterType) {
+    const cookies = new Cookies();
+    const storedFilter = cookies.get(`filter-${filterType}`);
+    if (storedFilter === undefined) {
+        return null;
+    }
+
+    return storedFilter;
 }
