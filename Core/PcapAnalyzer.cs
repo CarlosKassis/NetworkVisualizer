@@ -16,6 +16,7 @@ namespace NetworkAnalyzer.Core
     using Utils.Dhcp;
     using NetworkAnalyzer.Utils.Dhcp.Options;
     using NetworkAnalyzer.Utils.Dhcp.Enums;
+    using System.Net;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -34,6 +35,13 @@ namespace NetworkAnalyzer.Core
         None
     };
 
+    public enum DomainSetPriority
+    {
+        FromActiveDirectory,
+        FromSubnet,
+        None
+    }
+
     // Need to always sync this with frontend enums
     // Lower values get higher priority
     public enum EntityType
@@ -49,6 +57,7 @@ namespace NetworkAnalyzer.Core
     {
         private OsSetPriority _osSetPriority = OsSetPriority.None;
         private MacSetPriority _macSetPriority = MacSetPriority.None;
+        private DomainSetPriority _domainSetPriority = DomainSetPriority.None;
 
 
         private object _lock = new object();
@@ -132,15 +141,36 @@ namespace NetworkAnalyzer.Core
                 }
             }
         }
+
+        public void SetDomain(string domain, DomainSetPriority domainSetPriority)
+        {
+            lock (_lock)
+            {
+                if (domainSetPriority <= _domainSetPriority)
+                {
+                    _domainSetPriority = domainSetPriority;
+                    Domain = domain;
+                }
+            }
+        }
     }
 
     class ConcurrentSubnetData
     {
+        private IPNetwork _network;
+
         public string? Domain { get; private set; }
 
-        public ConcurrentSubnetData(string? domain = null)
+        public ConcurrentSubnetData(string subnet,string? domain)
         {
+            _network = IPNetwork.Parse(subnet);
+
             Domain = domain;
+        }
+
+        public bool IsIpInSubnet(string ip)
+        {
+            return _network.Contains(IPAddress.Parse(ip));
         }
     }
 
@@ -208,7 +238,7 @@ namespace NetworkAnalyzer.Core
 
             // Process in parallel
             await AnalyzeAggregatedPacketsInParallel(ThreadCount);
-            await DoFinalProcessingOnData(ThreadCount);
+            await DoFinalDataProcessing(ThreadCount);
 
             return GenerateCytoscapeGraphJsonFromAnalysis();
         }
@@ -288,7 +318,7 @@ namespace NetworkAnalyzer.Core
             _packets.Add(packet);
         }
 
-        private async Task DoFinalProcessingOnData(int threadCount)
+        private async Task DoFinalDataProcessing(int threadCount)
         {
             var entities = _entities.ToArray();
             int chunkSize = entities.Length / threadCount + 1;
@@ -309,6 +339,12 @@ namespace NetworkAnalyzer.Core
                         {
                             // Entity provides services that are server-like
                             entities[i].Value.SetTypeAndMarkAvailableServices(EntityType.Server);
+                        }
+
+                        ConcurrentSubnetData? subnetThatContainsEntityIp = _subnets.FirstOrDefault(subnet => subnet.Value.IsIpInSubnet(entities[i].Key)).Value;
+                        if (subnetThatContainsEntityIp != null && subnetThatContainsEntityIp.Domain != null)
+                        {
+                            entities[i].Value.SetDomain(subnetThatContainsEntityIp.Domain, DomainSetPriority.FromSubnet);
                         }
                     }
                 });
@@ -456,10 +492,11 @@ namespace NetworkAnalyzer.Core
             AssertEntityPresentOrAdd(dhcpServerIpStr);
             _entities[dhcpServerIpStr].SetTypeAndMarkAvailableServices(EntityType.DHCP);
 
+
             // Add subnet to gathered subnets
             var subnet = $"{AddressUtils.IpBytesToString(subnetIpBytes)}/{AddressUtils.MaskAddressToMaskNumber(subnetMaskAddress)}";
             var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
-            _subnets.TryAdd(subnet, new ConcurrentSubnetData(subnetDomain));
+            _subnets.TryAdd(subnet, new ConcurrentSubnetData(subnet, subnetDomain));
 
             // Add routers info`
             ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="Cytoscape.js" Version="2.7.10" />
+    <PackageReference Include="IPNetwork2" Version="2.6.548" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="Pcap.Net.x64" Version="1.0.4.1" />

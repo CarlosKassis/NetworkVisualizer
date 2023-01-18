@@ -32,7 +32,9 @@ function CytoscapeWrapper(props) {
                             'background-image': 'data(image)',
                             'background-fit': 'cover',
                             'background-clip': 'none',
-                            'background-opacity': 0
+                            'background-opacity': 0,
+                            'width': '50px',
+                            'height': '50px'
                         },
                     },
 
