@@ -244,7 +244,7 @@ namespace NetworkAnalyzer.Core
         private readonly string? _filePath;
         private readonly Parser _userAgentParser = Parser.GetDefault();
         private readonly PacketCommunicator _packetCommunicator;
-        private readonly Task _packetCaptureTask;
+        private readonly Task _packetSniffTask;
         private readonly CaptureType _captureType; // TODO: use inheritance
 
         // Offline packet capture
@@ -255,7 +255,7 @@ namespace NetworkAnalyzer.Core
             // Optimization: add BPF filters
             OfflinePacketDevice captureFileDevice = new OfflinePacketDevice(_filePath);
             _packetCommunicator = captureFileDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetCaptureTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
             _captureType = CaptureType.Offline;
         }
 
@@ -266,8 +266,14 @@ namespace NetworkAnalyzer.Core
             var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
             var wifiCard = avaliableCaptureDevices.First(device => device.Description.Contains("160MHz")); // Choose my WiFi card
             _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetCaptureTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
             _captureType = CaptureType.Live;
+        }
+
+        public async Task StopSniffingPackets()
+        {
+            _packetCommunicator.Break();
+            await _packetSniffTask;
         }
 
         public async Task<string> GenerateCytoscapeGraphJson()
@@ -275,7 +281,7 @@ namespace NetworkAnalyzer.Core
             if (_captureType == CaptureType.Offline)
             {
                 // Wait for file read
-                await _packetCaptureTask;
+                await _packetSniffTask;
             }
 
             // Process in parallel

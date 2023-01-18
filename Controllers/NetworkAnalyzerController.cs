@@ -73,12 +73,24 @@ public class NetworkAnalyzerController : ControllerBase
     {
         _livePcapAnalyzer = new PcapAnalyzer();
         _liveCaptureGuid = Guid.NewGuid();
+        if (_liveCaptureGuid == null)
+        {
+            return StatusCode(500, "Failed to generate capture session ID");
+        }
+
         return Content(_liveCaptureGuid.ToString());
     }
 
     [HttpGet("tracklive")]
     public async Task<IActionResult> StartLivePacketCapture(string liveCaptureId)
     {
-        return Content(await _livePcapAnalyzer.GenerateCytoscapeGraphJson());
+        return Content(await _livePcapAnalyzer?.GenerateCytoscapeGraphJson() ?? "{}");
+    }
+
+    [HttpPost("stoplive")]
+    public async Task<IActionResult> StopLivePacketCapture(string liveCaptureId)
+    {
+        await _livePcapAnalyzer?.StopSniffingPackets();
+        return Ok();
     }
 }
