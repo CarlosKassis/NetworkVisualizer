@@ -6,17 +6,11 @@ import Cookies from 'universal-cookie';
 
 function GraphFilter(props) {
 
-    const [initilized, setInitialized] = useState(false);
     const [inclusionString, setInclusionString] = useState('');
     const [exclusionString, setExclusionString] = useState('');
 
+    // Run once on load
     useEffect(() => {
-        if (initilized) {
-            return;
-        }
-
-        setInitialized(true);
-
         const storedInclusions = getStoredFilter("Inclusions")
         const storedExclusions = getStoredFilter("Exclusions")
 
@@ -29,7 +23,7 @@ function GraphFilter(props) {
         }
 
         onFilter(storedInclusions, storedExclusions, false);
-    }, [initilized]);
+    }, []);
 
     function onClickFilter() {
         onFilter(inclusionString, exclusionString);

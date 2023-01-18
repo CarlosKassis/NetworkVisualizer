@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import FileUploadSingle from './FileUpload'
 import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
@@ -11,9 +11,11 @@ function Home() {
     const [graphElements, setGraphElements] = useState([]); // Is a full/filtered fullGraphElements
     const [fullGraphElements, setFullGraphElements] = useState([]);
     const [entityToData, setEntityToData] = useState(null)
+    const liveCaptureId = useRef(null);
 
     const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
-    const [subnetFilter, setSubnetFilter] = useState({ "inclusion":[], "exclusion":[]});
+    const [subnetFilter, setSubnetFilter] = useState({ "inclusion": [], "exclusion": [] });
+    const [pollLiveCapture, setPollLiveCapture] = useState(false);
 
     const EntityType = 
     {
@@ -28,6 +30,47 @@ function Home() {
     useEffect(() => {
         applyFilteringAndSetGraphElements();
     }, [fullGraphElements, subnetFilter]);
+
+    useEffect(() => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `networkanalyzer/live/start`);
+
+        xhr.onload = () => {
+            if (xhr.status == 200) {
+                console.log(`Setting live capture ID: ${xhr.responseText}`)
+                liveCaptureId.current = xhr.responseText;
+            }
+        };
+
+        xhr.send(null);
+
+        const interval = setInterval(() => {
+            tryGetLiveCaptureJson();
+        }, 8000);
+        return () => clearInterval(interval);
+    }, []);
+
+    function tryGetLiveCaptureJson() {
+        console.log("Polling live capture...");
+        console.log(liveCaptureId.current);
+        if (liveCaptureId.current === null) {
+            return;
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `networkanalyzer/live/data?liveCaptureId=${liveCaptureId.current}`);
+
+        xhr.onload = () => {
+            if (xhr.status == 200) {
+                onReceiveNetworkInfoJson(xhr.responseText)
+            }
+            else {
+                // TODO: reset live capture!!!!!!!
+            }
+        };
+
+        xhr.send(null);
+    }
 
     function tryFillIpFiltersFromString(filterList, filterString) {
         if (filterString === '' || filterString === null) {
@@ -93,8 +136,9 @@ function Home() {
         return true;
     }
 
-    const fileUploadCallback = (json) =>
+    function onReceiveNetworkInfoJson(json)
     {
+        console.log(json);
         const networkInfo = JSON.parse(json);
         if (!networkInfo) {
             // TODO: show error
@@ -148,8 +192,12 @@ function Home() {
 
             if (networkInfo.EntityPositions != null) {
                 let entityPosition = networkInfo.EntityPositions[entityIp]
-                x = entityPosition[0];
-                y = entityPosition[1];
+
+                // Bug
+                if (entityPosition !== undefined) {
+                    x = entityPosition[0];
+                    y = entityPosition[1];
+                }
             }
 
             // Figure icon
@@ -193,7 +241,7 @@ function Home() {
         <div style={{ fontFamily: 'Arial !important' }}>
             <div className={"container"} >
                 <h2>Traffic Analysis</h2>
-                <FileUploadSingle onCallback={fileUploadCallback} />
+                <FileUploadSingle onCallback={onReceiveNetworkInfoJson} />
                 <br />
             </div>
             <div style={{

@@ -18,7 +18,7 @@ function FileUploadSingle(props) {
             formData.append('file', uploadedfile);
 
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', 'networkanalyzer');
+            xhr.open('GET', 'networkanalyzer/offline');
 
             xhr.onload = () => {
                 // TODO: check response status

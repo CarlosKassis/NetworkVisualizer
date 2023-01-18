@@ -62,9 +62,11 @@ namespace NetworkAnalyzer.Core
         private DomainSetPriority _domainSetPriority = DomainSetPriority.None;
 
 
-        private object _lock = new object();
+        public object _lock = new object();
 
+        // DON'T USE DIRECTLY, NOT THREAD-SAFE, field is like this for serialization
         public readonly HashSet<string> Services = new HashSet<string>();
+
         public string? Ip { get; private set; }
         public string? Hostname { get; private set; }
         public string? Domain { get; private set; }
@@ -83,6 +85,25 @@ namespace NetworkAnalyzer.Core
             Subnet = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.0/24";
         }
 
+        public void AddService(string service)
+        {
+            lock (_lock)
+            {
+                if (!Services.Contains(service))
+                {
+                    Services.Add(service);
+                }
+            }
+        }
+
+        public List<string> GetServices()
+        {
+            lock (_lock)
+            {
+                return Services.ToList();
+            }
+        }
+
         public void SetOs(string os, OsSetPriority priority)
         {
             if (os == null)
@@ -92,7 +113,7 @@ namespace NetworkAnalyzer.Core
 
             lock (_lock)
             {
-                if (priority <= _osSetPriority)
+                if (priority <= _osSetPriority || Os == "Other" && os != "Other")
                 {
                     _osSetPriority = priority;
                     Os = os;
@@ -194,7 +215,7 @@ namespace NetworkAnalyzer.Core
         }
     }
 
-    public class PcapAnalyzer : IDisposable
+    public class PcapAnalyzer : IAsyncDisposable
     {
         private const int ThreadCount = 10;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
@@ -266,14 +287,8 @@ namespace NetworkAnalyzer.Core
             var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
             var wifiCard = avaliableCaptureDevices.First(device => device.Description.Contains("160MHz")); // Choose my WiFi card
             _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AnalyzePacket));
             _captureType = CaptureType.Live;
-        }
-
-        public async Task StopSniffingPackets()
-        {
-            _packetCommunicator.Break();
-            await _packetSniffTask;
         }
 
         public async Task<string> GenerateCytoscapeGraphJson()
@@ -348,19 +363,20 @@ namespace NetworkAnalyzer.Core
             }
 
             // Generate graph JSON
+            // use .ToList() intensively for concurrency
             var graphClass = new
             {
-                Entities = _entities
+                Entities = _entities.ToList()
                 .Where(kvp => !kvp.Value.IsABroadcastAddress())
                 .Select(kvp => new object[] { kvp.Key, kvp.Value }),
 
-                Interactions = _interactions
+                Interactions = _interactions.ToList()
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item1, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item2, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
                 .Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
 
                 EntityPositions = subnetEntityPositions,
-                Subnets = _subnets.Select(kvp => new object[] { kvp.Key, kvp.Value })
+                Subnets = _subnets.ToList().Select(kvp => new object[] { kvp.Key, kvp.Value })
             };
 
             return JsonConvert.SerializeObject(graphClass);
@@ -390,7 +406,7 @@ namespace NetworkAnalyzer.Core
                             break;
                         }
 
-                        if (entities[i].Value.Services.Any(service => ServicesThatMakeYouAServer.Contains(service)))
+                        if (entities[i].Value.GetServices().Any(service => ServicesThatMakeYouAServer.Contains(service)))
                         {
                             // Entity provides services that are server-like
                             entities[i].Value.SetTypeAndMarkAvailableServices(EntityType.Server);
@@ -433,16 +449,23 @@ namespace NetworkAnalyzer.Core
 
         private void AnalyzePacket(Packet packet)
         {
-            // Make sure this is at start to first add source Ip if present
-            TryExtractEntity(packet);
+            try
+            {
+                // Make sure this is at start to first add source Ip if present
+                TryExtractEntity(packet);
 
-            TryExtractInteraction(packet);
-            TryExtractDeviceProvidedService(packet);
-            TryExtractOsFromHttp(packet);
-            TryExtractDnsInfo(packet);
-            TryExtractDHCPInfo(packet);
-            TryExtractARPInfo(packet);
-            TryExtractSSDPInfo(packet);
+                TryExtractInteraction(packet);
+                TryExtractDeviceProvidedService(packet);
+                TryExtractOsFromHttp(packet);
+                TryExtractDnsInfo(packet);
+                TryExtractDHCPInfo(packet);
+                TryExtractARPInfo(packet);
+                TryExtractSSDPInfo(packet);
+            }
+            catch
+            {
+                // TODO: log
+            }
         }
 
         private string? TryGetSourceIpFromSSDPPayload(string userAgent)
@@ -843,7 +866,7 @@ namespace NetworkAnalyzer.Core
                 ushort port = packet.Ethernet.IpV4.Tcp.SourcePort;
                 if (TcpPortToServiceName.ContainsKey(port))
                 {
-                    _entities[packet.Ethernet.IpV4.Source.ToString()].Services.Add(TcpPortToServiceName[port]);
+                    _entities[packet.Ethernet.IpV4.Source.ToString()].AddService(TcpPortToServiceName[port]);
                 }
             }
             else
@@ -851,14 +874,15 @@ namespace NetworkAnalyzer.Core
                 ushort port = packet.Ethernet.IpV4.Udp.SourcePort;
                 if (UdpPortToServiceName.ContainsKey(port))
                 {
-                    _entities[packet.Ethernet.IpV4.Source.ToString()].Services.Add(UdpPortToServiceName[port]);
+                    _entities[packet.Ethernet.IpV4.Source.ToString()].AddService(UdpPortToServiceName[port]);
                 }
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            _packetCommunicator?.Dispose();
+            _packetCommunicator.Break();
+            await _packetSniffTask;
         }
     }
 }
