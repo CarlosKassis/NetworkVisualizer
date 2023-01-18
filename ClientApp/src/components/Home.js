@@ -21,7 +21,7 @@ function Home() {
     }, [fullGraphElements, subnetFilter]);
 
     function tryFillIpFiltersFromString(filterList, filterString) {
-        if (filterString === '') {
+        if (filterString === '' || filterString === null) {
             return;
         }
 

@@ -65,7 +65,7 @@ export function isIpInSubnet(ipInteger, subnetInteger, maskInteger) {
 
 export function isValidFilter(filterString) {
     // Empty filter
-    if (filterString === '') {
+    if (filterString === '' || filterString === null) {
         return true;
     }
 
