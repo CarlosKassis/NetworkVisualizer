@@ -6,6 +6,7 @@ import GraphFilter from './GraphFilter';
 import './Cyber.css'
 import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 import DropDown from './DropDown';
+import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
 
 function Home() {
 
@@ -13,14 +14,13 @@ function Home() {
     const [fullGraphElements, setFullGraphElements] = useState([]);
     const [entityToData, setEntityToData] = useState(null)
     const liveCaptureId = useRef(null);
+    const isLiveCapturing = useRef(false);
 
     const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion": [], "exclusion": [] });
-    const [pollLiveCapture, setPollLiveCapture] = useState(false);
     const [resetNetworkView, setResetNetworkView] = useState(true);
     const [nics, setNics] = useState([]);
     const [selectedNic, setSelectedNic] = useState('');
-    const [isLiveCapturing, setIsLiveCapturing] = useState(false);
 
     const EntityType = 
     {
@@ -31,83 +31,23 @@ function Home() {
         'Computer': 4
     };
 
-    // Filter after changing graph elements
     useEffect(() => {
         applyFilteringAndSetGraphElements();
     }, [fullGraphElements, subnetFilter]);
 
-
-
     useEffect(() => {
-
-        // Get NICs
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', `networkanalyzer/nics`);
-        xhr.onload = () => {
-            if (xhr.status == 200) {
-                const nicsArray = JSON.parse(xhr.responseText);
-                setNics(nicsArray);
-            }
-        };
-        xhr.send(null);
-
+        getNicsApi((nicsJson) => setNics(JSON.parse(nicsJson)));
     }, []);
+
 
     useEffect(() => {
         const intervalId = setInterval(() => {
-            tryGetLiveCaptureJson();
-        }, 8000);
+            if (isLiveCapturing.current) {
+                getLiveCaptureDataApi(liveCaptureId.current, onReceiveNetworkInfoJson);
+            }
+        }, 2000);
         return () => clearInterval(intervalId);
     }, []);
-
-
-    function startLiveCapture() {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `networkanalyzer/live/start?nicDesc=${selectedNic}`);
-
-        xhr.onload = () => {
-            if (xhr.status == 200) {
-                liveCaptureId.current = xhr.responseText;
-                setIsLiveCapturing(true);
-            }
-        };
-
-        xhr.send(null);
-    }
-
-    function stopLiveCapture() {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `networkanalyzer/live/stop?liveCaptureId=${liveCaptureId.current}`);
-
-        xhr.onload = () => {
-            if (xhr.status == 200) {
-                liveCaptureId.current = null;
-                setIsLiveCapturing(false);
-            }
-        };
-
-        xhr.send(null);
-    }
-
-    function tryGetLiveCaptureJson() {
-        if (liveCaptureId.current === null) {
-            return;
-        }
-
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', `networkanalyzer/live/data?liveCaptureId=${liveCaptureId.current}`);
-
-        xhr.onload = () => {
-            if (xhr.status == 200) {
-                onReceiveNetworkInfoJson(xhr.responseText)
-            }
-            else {
-                // TODO: reset live capture!!!!!!!
-            }
-        };
-
-        xhr.send(null);
-    }
 
     function tryFillIpFiltersFromString(filterList, filterString) {
         if (filterString === '' || filterString === null) {
@@ -204,15 +144,11 @@ function Home() {
 
     const writeEntityDataToEntityInfo = (nodeId) =>
     {
-        if (!entityToData) {
+        if (!entityToData || entityToData[nodeId] === undefined) {
             return;
         }
 
         var entityData = entityToData[nodeId];
-        if (entityData === undefined) {
-            return;
-        }
-
         setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain, entityData.Services.join(','));
     }
 
@@ -291,6 +227,22 @@ function Home() {
         setSelectedNic(nic);
     }
 
+    function onStartLiveCaptureResponse(liveCaptureIdResponse) {
+        if (liveCaptureIdResponse !== null) {
+            liveCaptureId.current = liveCaptureIdResponse;
+            isLiveCapturing.current = true;
+        }
+        else {
+            // TODO: alert!!
+        }
+    }
+
+    function stopLiveCapture() {
+        stopLiveCaptureApi(liveCaptureId.current);
+        liveCaptureId.current = null;
+        isLiveCapturing.current = false;
+    }
+
     return (
         <div style={{ fontFamily: 'Arial !important' }}>
             <div className={"container"} >
@@ -308,7 +260,7 @@ function Home() {
                         <div style={{
                             width: '50%', display: 'flex', flexDirection: 'row'
                         }}>
-                            <button onClick={startLiveCapture}>Capture</button>
+                            <button onClick={() => startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse)}>Capture</button>
                             <button onClick={stopLiveCapture}>Stop</button>
                         </div>
                         <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
