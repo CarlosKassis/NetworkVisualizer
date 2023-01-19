@@ -7,6 +7,7 @@ import './Cyber.css'
 import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
+import BandwidthChart from './BandwidthChart';
 
 function Home() {
 
@@ -15,6 +16,7 @@ function Home() {
     const [entityToData, setEntityToData] = useState(null)
     const liveCaptureId = useRef(null);
     const isLiveCapturing = useRef(false);
+
 
     const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion": [], "exclusion": [] });
@@ -38,7 +40,6 @@ function Home() {
     useEffect(() => {
         getNicsApi((nicsJson) => setNics(JSON.parse(nicsJson)));
     }, []);
-
 
     useEffect(() => {
         const intervalId = setInterval(() => {
@@ -245,7 +246,7 @@ function Home() {
 
     return (
         <div style={{ fontFamily: 'Arial !important' }}>
-            <div className={"container"} >
+                <div className={"container"} >
                 <h2 style={{ textAlign: 'center', marginBottom:'40px' }}>Traffic Analysis</h2>
                 <div style={{
                     display: 'flex',
@@ -269,7 +270,7 @@ function Home() {
                 </div>
             </div>
             <div style={{
-                height: '75vh',
+                height: '50%',
                 display: 'flex',
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
@@ -289,6 +290,7 @@ function Home() {
                     <GraphFilter onFilterGraph={onFilterGraph} />
                 </div>
             </div>
+            <BandwidthChart />
         </div>
     );
 }
