@@ -5,6 +5,7 @@ import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
 import './Cyber.css'
 import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
+import DropDown from './DropDown';
 
 function Home() {
 
@@ -16,6 +17,10 @@ function Home() {
     const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion": [], "exclusion": [] });
     const [pollLiveCapture, setPollLiveCapture] = useState(false);
+    const [resetNetworkView, setResetNetworkView] = useState(true);
+    const [nics, setNics] = useState([]);
+    const [selectedNic, setSelectedNic] = useState('');
+    const [isLiveCapturing, setIsLiveCapturing] = useState(false);
 
     const EntityType = 
     {
@@ -31,28 +36,62 @@ function Home() {
         applyFilteringAndSetGraphElements();
     }, [fullGraphElements, subnetFilter]);
 
+
+
     useEffect(() => {
+
+        // Get NICs
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `networkanalyzer/live/start`);
+        xhr.open('GET', `networkanalyzer/nics`);
+        xhr.onload = () => {
+            if (xhr.status == 200) {
+                const nicsArray = JSON.parse(xhr.responseText);
+                setNics(nicsArray);
+            }
+        };
+        xhr.send(null);
+
+    }, []);
+
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            tryGetLiveCaptureJson();
+        }, 2000);
+        return () => clearInterval(intervalId);
+    }, []);
+
+
+    function startLiveCapture() {
+        const xhr = new XMLHttpRequest();
+        console.log(selectedNic);
+        xhr.open('POST', `networkanalyzer/live/start?nicDesc=${selectedNic}`);
 
         xhr.onload = () => {
             if (xhr.status == 200) {
-                console.log(`Setting live capture ID: ${xhr.responseText}`)
                 liveCaptureId.current = xhr.responseText;
+                setIsLiveCapturing(true);
             }
         };
 
         xhr.send(null);
+    }
 
-        const interval = setInterval(() => {
-            tryGetLiveCaptureJson();
-        }, 8000);
-        return () => clearInterval(interval);
-    }, []);
+    function stopLiveCapture() {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `networkanalyzer/live/stop?liveCaptureId=${liveCaptureId.current}`);
+
+        xhr.onload = () => {
+            if (xhr.status == 200) {
+                liveCaptureId.current = null;
+                setIsLiveCapturing(false);
+            }
+        };
+
+        xhr.send(null);
+    }
 
     function tryGetLiveCaptureJson() {
-        console.log("Polling live capture...");
-        console.log(liveCaptureId.current);
+        console.log("t3theer")
         if (liveCaptureId.current === null) {
             return;
         }
@@ -136,21 +175,30 @@ function Home() {
         return true;
     }
 
+    useEffect(() => {
+        setEntityInfoPanelData();
+    }, [resetNetworkView]);
+
+    function onFileUpload(json) {
+        onReceiveNetworkInfoJson(json);
+        setResetNetworkView(true);
+    }
+
     function onReceiveNetworkInfoJson(json)
     {
-        console.log(json);
         const networkInfo = JSON.parse(json);
         if (!networkInfo) {
             // TODO: show error
             return;
         }
+
+
         var entityDictionary = {};
         for (const entity of networkInfo.Entities) {
             entityDictionary[entity[0]] = entity[1];
         }
 
         setEntityToData(entityDictionary);
-        setEntityInfoPanelData()
 
         const graphElements = generateGraphElements(networkInfo);
         setFullGraphElements(graphElements);
@@ -211,8 +259,13 @@ function Home() {
             {
                 icon = '/gateway.png';
             }
-            else if (entityData.Type === EntityType.DHCP) {
+            else if (entityData.Type === EntityType.DHCP)
+            {
                 icon = '/dhcp.png';
+            }
+            else if (entityData.Type === EntityType.DNS)
+            {
+                icon = '/dns.png';
             }
             else if (entityData.Type === EntityType.Server)
             {
@@ -236,13 +289,35 @@ function Home() {
         return elements;
     }
 
+    function onSelectNic(nic) {
+        console.log(nic);
+        setSelectedNic(nic);
+    }
 
     return (
         <div style={{ fontFamily: 'Arial !important' }}>
             <div className={"container"} >
-                <h2>Traffic Analysis</h2>
-                <FileUploadSingle onCallback={onReceiveNetworkInfoJson} />
-                <br />
+                <h2 style={{ textAlign: 'center', marginBottom:'40px' }}>Traffic Analysis</h2>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    height: '75px'
+                }}>
+                    <div style={{width:'50%'} }>
+                        <FileUploadSingle onCallback={onFileUpload} />
+                        <br />
+                    </div>
+                    <div>
+                        <div style={{
+                            width: '50%', display: 'flex', flexDirection: 'row'
+                        }}>
+                            <button onClick={startLiveCapture}>Capture</button>
+                            <button onClick={stopLiveCapture}>Stop</button>
+                        </div>
+                        <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
+                    </div>
+
+                </div>
             </div>
             <div style={{
                 height: '75vh',
@@ -250,7 +325,7 @@ function Home() {
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
             }}>
-                <CytoscapeWrapper graphElements={graphElements} onNodeClick={writeEntityDataToEntityInfo} />
+                <CytoscapeWrapper resetNetworkView={resetNetworkView} graphElements={graphElements} onNodeClick={writeEntityDataToEntityInfo} />
                 <div style={{
                     borderColor: '#555',
                     boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',

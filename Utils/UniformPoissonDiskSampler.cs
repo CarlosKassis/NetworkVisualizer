@@ -35,6 +35,7 @@ namespace NetworkAnalyzer.Utils
         {
             return SampleCircle(center, radius, minimumDistance, DefaultPointsPerIteration);
         }
+
         public static List<Vector2> SampleCircle(Vector2 center, float radius, float minimumDistance, int pointsPerIteration)
         {
             return Sample(center - new Vector2(radius), center + new Vector2(radius), radius, minimumDistance, pointsPerIteration);
@@ -51,6 +52,9 @@ namespace NetworkAnalyzer.Utils
 
         static List<Vector2> Sample(Vector2 topLeft, Vector2 lowerRight, float? rejectionDistance, float minimumDistance, int pointsPerIteration)
         {
+            // Use same seed for similiar positioning
+            Random random = new Random(1000);
+
             var settings = new Settings
             {
                 TopLeft = topLeft,
@@ -61,6 +65,7 @@ namespace NetworkAnalyzer.Utils
                 MinimumDistance = minimumDistance,
                 RejectionSqDistance = rejectionDistance == null ? null : rejectionDistance * rejectionDistance
             };
+
             settings.GridWidth = (int)(settings.Dimensions.X / settings.CellSize) + 1;
             settings.GridHeight = (int)(settings.Dimensions.Y / settings.CellSize) + 1;
 
@@ -71,17 +76,17 @@ namespace NetworkAnalyzer.Utils
                 Points = new List<Vector2>()
             };
 
-            AddFirstPoint(ref settings, ref state);
+            AddFirstPoint(ref settings, ref state, random);
 
             while (state.ActivePoints.Count != 0)
             {
-                var listIndex = RandomHelper.Random.Next(state.ActivePoints.Count);
-
+                var listIndex = random.Next(state.ActivePoints.Count);
+                
                 var point = state.ActivePoints[listIndex];
                 var found = false;
 
                 for (var k = 0; k < pointsPerIteration; k++)
-                    found |= AddNextPoint(point, ref settings, ref state);
+                    found |= AddNextPoint(point, ref settings, ref state, random);
 
                 if (!found)
                     state.ActivePoints.RemoveAt(listIndex);
@@ -90,15 +95,15 @@ namespace NetworkAnalyzer.Utils
             return state.Points;
         }
 
-        static void AddFirstPoint(ref Settings settings, ref State state)
+        static void AddFirstPoint(ref Settings settings, ref State state, Random random)
         {
             var added = false;
             while (!added)
             {
-                var d = RandomHelper.Random.NextDouble();
+                var d = random.NextDouble();
                 var xr = settings.TopLeft.X + settings.Dimensions.X * d;
 
-                d = RandomHelper.Random.NextDouble();
+                d = random.NextDouble();
                 var yr = settings.TopLeft.Y + settings.Dimensions.Y * d;
 
                 var p = new Vector2((float)xr, (float)yr);
@@ -115,10 +120,10 @@ namespace NetworkAnalyzer.Utils
             }
         }
 
-        static bool AddNextPoint(Vector2 point, ref Settings settings, ref State state)
+        static bool AddNextPoint(Vector2 point, ref Settings settings, ref State state, Random random)
         {
             var found = false;
-            var q = GenerateRandomAround(point, settings.MinimumDistance);
+            var q = GenerateRandomAround(point, settings.MinimumDistance, random);
 
             if (q.X >= settings.TopLeft.X && q.X < settings.LowerRight.X &&
                 q.Y > settings.TopLeft.Y && q.Y < settings.LowerRight.Y &&
@@ -143,12 +148,12 @@ namespace NetworkAnalyzer.Utils
             return found;
         }
 
-        static Vector2 GenerateRandomAround(Vector2 center, float minimumDistance)
+        static Vector2 GenerateRandomAround(Vector2 center, float minimumDistance, Random random)
         {
-            var d = RandomHelper.Random.NextDouble();
+            var d = random.NextDouble();
             var radius = minimumDistance + minimumDistance * d;
 
-            d = RandomHelper.Random.NextDouble();
+            d = random.NextDouble();
             var angle = MathHelper.TwoPi * d;
 
             var newX = radius * Math.Sin(angle);
@@ -161,11 +166,6 @@ namespace NetworkAnalyzer.Utils
         {
             return new Vector2((int)((point.X - origin.X) / cellSize), (int)((point.Y - origin.Y) / cellSize));
         }
-    }
-
-    public static class RandomHelper
-    {
-        public static readonly Random Random = new Random(1000);
     }
 
     public static class MathHelper

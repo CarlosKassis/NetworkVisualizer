@@ -18,11 +18,11 @@ function FileUploadSingle(props) {
             formData.append('file', uploadedfile);
 
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'networkanalyzer/offline');
+            xhr.open('POST', 'networkanalyzer');
 
             xhr.onload = () => {
                 // TODO: check response status
-                 props.onCallback(xhr.responseText)
+                props.onCallback(xhr.responseText)
             };
 
             xhr.send(formData);
@@ -34,8 +34,8 @@ function FileUploadSingle(props) {
 
     return (
         <div>
+            <button style={{ marginRight: '20px' }} className={"btn-cyber"} onClick={handleFileUpload}>Upload</button>
             <input type="file" onChange={(e) => setUploadedfile(e.target.files[0])} multiple={false} />
-            <button className={"btn-cyber"} onClick={handleFileUpload}>Upload</button>
         </div>
     );
 }

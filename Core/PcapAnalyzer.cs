@@ -24,6 +24,7 @@ namespace NetworkAnalyzer.Core
     public enum OsSetPriority
     {
         FromHttpRequest,
+        FromHostnameDesktopSlash,
         FromSSDP,
         None
     };
@@ -53,6 +54,12 @@ namespace NetworkAnalyzer.Core
         DNS,
         Server,
         Computer
+    };
+
+    public enum CaptureType
+    {
+        Offline,
+        Live
     };
 
     class ConcurrentEntityData
@@ -113,7 +120,7 @@ namespace NetworkAnalyzer.Core
 
             lock (_lock)
             {
-                if (priority <= _osSetPriority || Os == "Other" && os != "Other")
+                if (priority <= _osSetPriority)
                 {
                     _osSetPriority = priority;
                     Os = os;
@@ -151,7 +158,7 @@ namespace NetworkAnalyzer.Core
             }
         }
 
-        public void SetTypeAndMarkAvailableServices(EntityType type)
+        public void TrySetTypeAndMarkAvailableServices(EntityType type)
         {
             lock (_lock)
             {
@@ -250,12 +257,6 @@ namespace NetworkAnalyzer.Core
             "DNS", "HTTP", "HTTPS"
         };
 
-        private enum CaptureType
-        {
-            Offline,
-            Live
-        };
-
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
@@ -269,26 +270,25 @@ namespace NetworkAnalyzer.Core
         private readonly CaptureType _captureType; // TODO: use inheritance
 
         // Offline packet capture
-        public PcapAnalyzer(string filePath)
+        public PcapAnalyzer(CaptureType captureType, string filePath = null, string nicDesc = null)
         {
+            _captureType = captureType;
             _filePath = filePath;
 
-            // Optimization: add BPF filters
-            OfflinePacketDevice captureFileDevice = new OfflinePacketDevice(_filePath);
-            _packetCommunicator = captureFileDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
-            _captureType = CaptureType.Offline;
-        }
-
-        // Live packet capture
-        // TODO: add choosing NIC
-        public PcapAnalyzer()
-        {
-            var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
-            var wifiCard = avaliableCaptureDevices.First(device => device.Description.Contains("160MHz")); // Choose my WiFi card
-            _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AnalyzePacket));
-            _captureType = CaptureType.Live;
+            if (captureType == CaptureType.Offline)
+            {
+                // Optimization: add BPF filters
+                OfflinePacketDevice captureFileDevice = new OfflinePacketDevice(_filePath);
+                _packetCommunicator = captureFileDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
+                _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
+            }
+            else
+            {
+                var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
+                var wifiCard = avaliableCaptureDevices.First(device => device.Description.Equals(nicDesc)); // Choose my WiFi card
+                _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
+                _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AnalyzePacket));
+            }
         }
 
         public async Task<string> GenerateCytoscapeGraphJson()
@@ -409,7 +409,7 @@ namespace NetworkAnalyzer.Core
                         if (entities[i].Value.GetServices().Any(service => ServicesThatMakeYouAServer.Contains(service)))
                         {
                             // Entity provides services that are server-like
-                            entities[i].Value.SetTypeAndMarkAvailableServices(EntityType.Server);
+                            entities[i].Value.TrySetTypeAndMarkAvailableServices(EntityType.Server);
                         }
 
                         ConcurrentSubnetData? subnetThatContainsEntityIp = _subnets.FirstOrDefault(subnet => subnet.Value.IsIpInSubnet(entities[i].Key)).Value;
@@ -455,7 +455,7 @@ namespace NetworkAnalyzer.Core
                 TryExtractEntity(packet);
 
                 TryExtractInteraction(packet);
-                TryExtractDeviceProvidedService(packet);
+                TryExtractDeviceServiceFromPort(packet);
                 TryExtractOsFromHttp(packet);
                 TryExtractDnsInfo(packet);
                 TryExtractDHCPInfo(packet);
@@ -538,7 +538,22 @@ namespace NetworkAnalyzer.Core
 
                 AssertEntityPresentOrAdd(sourceIp);
                 var entityData = _entities[sourceIp];
-                entityData.SetOs(clientInfo.OS.ToString(), OsSetPriority.FromSSDP);
+
+                if (payload.Contains("windows", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (clientInfo.OS.ToString().Contains("windows", StringComparison.OrdinalIgnoreCase))
+                    {
+                        entityData.SetOs(clientInfo.OS.ToString(), OsSetPriority.FromSSDP);
+                    }
+                    else
+                    {
+                        entityData.SetOs("Windows", OsSetPriority.FromSSDP);
+                    }
+                }
+                else
+                {
+                    entityData.SetOs(clientInfo.OS.ToString(), OsSetPriority.FromSSDP);
+                }
             }
             catch
             {
@@ -580,6 +595,7 @@ namespace NetworkAnalyzer.Core
 
         private void TryExtractDHCPInfo(Packet packet)
         {
+            return;
             if (!packet.IsUdp())
             {
                 return;
@@ -646,7 +662,7 @@ namespace NetworkAnalyzer.Core
             // Add DHCP server info
             string dhcpServerIpStr = dhcpServerIp.ToString();
             AssertEntityPresentOrAdd(dhcpServerIpStr);
-            _entities[dhcpServerIpStr].SetTypeAndMarkAvailableServices(EntityType.DHCP);
+            _entities[dhcpServerIpStr].TrySetTypeAndMarkAvailableServices(EntityType.DHCP);
 
 
             // Add subnet to gathered subnets
@@ -662,7 +678,7 @@ namespace NetworkAnalyzer.Core
                     {
                         var routerIp = ip.ToString();
                         AssertEntityPresentOrAdd(routerIp);
-                        _entities[routerIp].SetTypeAndMarkAvailableServices(EntityType.Gateway);
+                        _entities[routerIp].TrySetTypeAndMarkAvailableServices(EntityType.Gateway);
                     }
                 });
 
@@ -673,7 +689,7 @@ namespace NetworkAnalyzer.Core
                 {
                     string dnsServerIpStr = dnsServerIp.ToString();
                     AssertEntityPresentOrAdd(dnsServerIpStr);
-                    _entities[dnsServerIpStr].SetTypeAndMarkAvailableServices(EntityType.DNS);
+                    _entities[dnsServerIpStr].TrySetTypeAndMarkAvailableServices(EntityType.DNS);
                 }
             });
 
@@ -717,7 +733,9 @@ namespace NetworkAnalyzer.Core
             // Add DNS server info
             if (packet.Ethernet.IpV4.Udp.SourcePort == 53)
             {
-
+                string dnsServerIp = packet.Ethernet.IpV4.Source.ToString();
+                AssertEntityPresentOrAdd(dnsServerIp);
+                _entities[dnsServerIp].TrySetTypeAndMarkAvailableServices(EntityType.DNS);
             }
 
             if (dns.Answers == null)
@@ -750,12 +768,13 @@ namespace NetworkAnalyzer.Core
                 }
 
                 string ip = ((DnsResourceDataIpV4)answer.Data).Data.ToString();
-                if (!_entities.ContainsKey(ip))
-                {
-                    _entities[ip] = new ConcurrentEntityData(ip);
-                }
-
+                AssertEntityPresentOrAdd(ip);
                 _entities[ip].SetHostname(hostname);
+
+                if (hostname.StartsWith("DESKTOP-"))
+                {
+                    _entities[ip].SetOs("Windows", OsSetPriority.FromHostnameDesktopSlash);
+                }
             }
         }
 
@@ -843,7 +862,7 @@ namespace NetworkAnalyzer.Core
             _interactions[sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp)] = 0;
         }
 
-        private void TryExtractDeviceProvidedService(Packet packet)
+        private void TryExtractDeviceServiceFromPort(Packet packet)
         {
             if (!packet.IsTcp() && !packet.IsUdp())
             {

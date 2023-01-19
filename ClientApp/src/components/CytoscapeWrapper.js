@@ -5,10 +5,9 @@ function CytoscapeWrapper(props) {
 
     const cyRef = useRef(null);
 
-    // Recenter on element change
     useEffect(() => {
         cyRef.current.center();
-    }, [props.graphElements]);
+    }, [props.resetNetworkView]);
 
     const onNodeClick = (event) => {
         props.onNodeClick(event.target.data().id);
@@ -22,7 +21,7 @@ function CytoscapeWrapper(props) {
                 textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
                     cyRef.current = cy;
-                    cy.on('click', 'node', onNodeClick)
+                    cy.on('tap', 'node', onNodeClick)
                 }}
                 stylesheet={[
                     {
