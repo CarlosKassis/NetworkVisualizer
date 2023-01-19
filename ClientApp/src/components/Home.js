@@ -56,14 +56,13 @@ function Home() {
     useEffect(() => {
         const intervalId = setInterval(() => {
             tryGetLiveCaptureJson();
-        }, 2000);
+        }, 8000);
         return () => clearInterval(intervalId);
     }, []);
 
 
     function startLiveCapture() {
         const xhr = new XMLHttpRequest();
-        console.log(selectedNic);
         xhr.open('POST', `networkanalyzer/live/start?nicDesc=${selectedNic}`);
 
         xhr.onload = () => {
@@ -91,7 +90,6 @@ function Home() {
     }
 
     function tryGetLiveCaptureJson() {
-        console.log("t3theer")
         if (liveCaptureId.current === null) {
             return;
         }
@@ -290,7 +288,6 @@ function Home() {
     }
 
     function onSelectNic(nic) {
-        console.log(nic);
         setSelectedNic(nic);
     }
 
