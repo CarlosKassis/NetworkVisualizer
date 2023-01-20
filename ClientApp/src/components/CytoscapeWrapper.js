@@ -19,10 +19,16 @@ function CytoscapeWrapper(props) {
 
     const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
     return (
-        <div style={{ width: '100%', backgroundColor: 'FEFEFE' }}>
-            <CytoscapeComponent minZoom={0.01} maxZoom={8} style={{ height: '100%' }}
+        <div style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'FEFEFE',
+            position: 'absolute',
+            zIndex:'1'
+        }}>
+            <CytoscapeComponent minZoom={0.01} maxZoom={8} style={{ height: '100vh' }}
                 elements={props.graphElements.length ? props.graphElements : [defaultElements]}
-                textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
+                //textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
                     cyRef.current = cy;
                     cy.on('tap', 'node', onNodeClick)

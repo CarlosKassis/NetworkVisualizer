@@ -103,8 +103,8 @@ function BandwidthChart(props) {
     }, [props.chartData]);
 
     return (
-        <div style={{ width:'500px', height:'500px' }}>
-            <canvas style={{ height: '5px' }} ref={chartContainer} />
+        <div className={"graph-floating"} style={{ width:'500px', height:'500px' }}>
+            <canvas ref={chartContainer} />
         </div>
     );
 }
