@@ -203,6 +203,25 @@ namespace NetworkAnalyzer.Core
         }
     }
 
+    class ConcurrentInteractionData
+    {
+        public readonly ConcurrentDictionary<long, long> _bytesPerSecond = new ConcurrentDictionary<long, long>();
+
+        public void AggregateBytes(long timestamp, long bytes)
+        {
+            _bytesPerSecond.AddOrUpdate(timestamp, bytes,(key, value) => value + bytes);
+        }
+
+        public ConcurrentInteractionData()
+        {
+        }
+
+        public ConcurrentInteractionData(long timestamp, long bytes)
+        {
+            _bytesPerSecond[timestamp] = bytes;
+        }
+    }
+
     class ConcurrentSubnetData
     {
         private IPNetwork _network;
@@ -224,7 +243,7 @@ namespace NetworkAnalyzer.Core
 
     public class PcapAnalyzer : IAsyncDisposable
     {
-        private const int ThreadCount = 10;
+        private const int ThreadCount = 1;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
         {
             { 20, "FTP" },
@@ -260,7 +279,7 @@ namespace NetworkAnalyzer.Core
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
-        private readonly ConcurrentDictionary<(string, string), int> _interactions = new ConcurrentDictionary<(string, string), int>();
+        private readonly ConcurrentDictionary<(string, string), ConcurrentInteractionData> _interactions = new ConcurrentDictionary<(string, string), ConcurrentInteractionData>();
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string? _filePath;
@@ -373,7 +392,7 @@ namespace NetworkAnalyzer.Core
                 Interactions = _interactions.ToList()
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item1, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item2, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
-                .Select(interaction => new string[] { interaction.Key.Item1, interaction.Key.Item2 }),
+                .Select(interaction => new object[] { new string[] { interaction.Key.Item1, interaction.Key.Item2 }, interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value}) }),
 
                 EntityPositions = subnetEntityPositions,
                 Subnets = _subnets.ToList().Select(kvp => new object[] { kvp.Key, kvp.Value })
@@ -859,7 +878,15 @@ namespace NetworkAnalyzer.Core
 
             // Compare to avoid adding same edge twice
             // Dicationary is used to do atomic [check if present] + [add]
-            _interactions[sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp)] = 0;
+            var interaction = sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp);
+            if (_interactions.TryGetValue(interaction, out var data))
+            {
+                data.AggregateBytes(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count);
+            }
+            else
+            {
+                _interactions.TryAdd(interaction, new ConcurrentInteractionData(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count));
+            }
         }
 
         private void TryExtractDeviceServiceFromPort(Packet packet)

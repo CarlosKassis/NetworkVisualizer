@@ -1,46 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
+import 'chartjs-adapter-moment';
+
 Chart.register(...registerables);
 
 function BandwidthChart(props) {
 
     const chartContainer = useRef(null);
-    const [chartInstance, setChartInstance] = useState(null);
-
-    useEffect(() => {
-        if (chartContainer && chartContainer.current) {
-            const newChartInstance = new Chart(chartContainer.current, config);
-            setChartInstance(newChartInstance);
-        }
-    }, [chartContainer]);
-
-    const datapoints = useRef([]);
-
-    function getRandomInt(max) {
-        return Math.floor(Math.random() * max);
-    }
-
-    const chartWidth = 500;
-
-    const labels = useRef([]);
-
-    for (let i = 0; i < chartWidth; ++i) {
-        labels.current.push(i.toString());
-        datapoints.current.push(getRandomInt(3000).toString());
-    }
+    const chartInstance = useRef(null);
 
     const data = {
-        labels: labels.current,
+        labels: [1],
         datasets: [
             {
-                label: '192.168.1.1 - 192.168.1.2',
-                data: datapoints.current,
-                borderColor: 'rgb(0, 220, 255)',
-                fill: {
-                    target: 'origin',
-                    above: 'rgb(180, 230, 255)'
-                },
-                cubicInterpolationMode: 'monotone',
+                label: '',
+                data: ["2", "4"],
+                //borderColor: 'rgb(0, 220, 255)',
+                backgroundColor: 'rgb(0, 220, 255)',
+                //fill: {
+                //    target: 'origin',
+                //    above: 'rgb(180, 230, 255)'
+                //},
                 tension: 0.1
             },
             /*{
@@ -54,14 +34,14 @@ function BandwidthChart(props) {
     };
 
     const config = {
-        type: 'line',
+        type: 'bar',
         data: data,
         options: {
             responsive: true,
             plugins: {
                 title: {
                     display: true,
-                    text: 'Chart.js Line Chart - Cubic interpolation mode'
+                    text: 'Traffic between entities'
                 },
             },
             interaction: {
@@ -72,20 +52,57 @@ function BandwidthChart(props) {
                     display: true,
                     title: {
                         display: true
-                    }
+                    },
+                    type: 'time'
                 },
                 y: {
                     display: true,
                     title: {
                         display: true,
-                        text: 'Mbps'
+                        text: 'Bytes/Second'
                     },
                     suggestedMin: 0,
-                    suggestedMax: 400
+                    suggestedMax: 5
                 }
             }
         },
     };
+
+    useEffect(() => {
+        if (chartInstance.current == null) {
+            if (chartContainer && chartContainer.current) {
+                const newChartInstance = new Chart(chartContainer.current, config);
+                chartInstance.current = newChartInstance;
+            }
+        }
+    }, [chartContainer])
+
+    useEffect(() => {
+
+        if (chartInstance.current == null) {
+            if (chartContainer && chartContainer.current) {
+                const newChartInstance = new Chart(chartContainer.current, config);
+                chartInstance.current = newChartInstance;
+            }
+        }
+
+        console.log(props.chartData);
+        if (props.chartData.length == 0) {
+            return;
+        }
+
+        chartInstance.current.data.labels = [];
+        chartInstance.current.data.datasets[0].data = [];
+
+        for (let i = 0; i < props.chartData.length; i++) {
+            chartInstance.current.data.labels.push(props.chartData[i][0]);
+            chartInstance.current.data.datasets[0].data.push(props.chartData[i][1]);
+        }
+
+        chartInstance.current.data.datasets[0].label = `${props.entity1} - ${props.entity2}`;
+
+        chartInstance.current.update('none');
+    }, [props.chartData]);
 
     return (
         <div>

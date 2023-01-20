@@ -13,6 +13,10 @@ function CytoscapeWrapper(props) {
         props.onNodeClick(event.target.data().id);
     }
 
+    const onEdgeClick = (event) => {
+        props.onEdgeClick(event.target.data().index);
+    }
+
     const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
     return (
         <div style={{ width: '100%', backgroundColor: 'FEFEFE' }}>
@@ -22,6 +26,7 @@ function CytoscapeWrapper(props) {
                 cy={(cy) => {
                     cyRef.current = cy;
                     cy.on('tap', 'node', onNodeClick)
+                    cy.on('tap', 'edge', onEdgeClick)
                 }}
                 stylesheet={[
                     {

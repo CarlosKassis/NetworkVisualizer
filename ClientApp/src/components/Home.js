@@ -16,13 +16,15 @@ function Home() {
     const [entityToData, setEntityToData] = useState(null)
     const liveCaptureId = useRef(null);
     const isLiveCapturing = useRef(false);
-
+    const interactions = useRef([]);
 
     const [entityInfo, setEntityInfo] = useState({ "ip": null, "os": null, "mac": null, "hostname": null, "domain": null, "services": null });
     const [subnetFilter, setSubnetFilter] = useState({ "inclusion": [], "exclusion": [] });
     const [resetNetworkView, setResetNetworkView] = useState(true);
     const [nics, setNics] = useState([]);
     const [selectedNic, setSelectedNic] = useState('');
+    const [chartData, setChartData] = useState([1]);
+    const [selectedInteraction, setSelectedInteraction] = useState({"entity1": '', "entity2": ''});
 
     const EntityType = 
     {
@@ -217,11 +219,26 @@ function Home() {
             elements.push({ 'data': { 'id': entityIp, 'label': label, 'image': icon }, 'position': { x: x, y: y } });
         }
 
+        var index = 0;
         for (const interaction of networkInfo.Interactions) {
-            elements.push({ 'data': { 'source': interaction[0], 'target': interaction[1] }, 'classes': 'edge' });
+            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'index': index }, 'classes': 'edge' });
+            index++;
         }
 
+        interactions.current = networkInfo.Interactions;
+
         return elements;
+    }
+
+    function updateBandwidthGraph(interactionIndex) {
+        var newChartData = [];
+        setSelectedInteraction({ "entity1": interactions.current[interactionIndex][0][0], "entity2": interactions.current[interactionIndex][0][1] })
+        var bytesPerSeconds = interactions.current[interactionIndex][1]
+        for (const byteCount of bytesPerSeconds) {
+            newChartData.push(byteCount);
+        }
+
+        setChartData(newChartData);
     }
 
     function onSelectNic(nic) {
@@ -266,7 +283,6 @@ function Home() {
                         </div>
                         <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
                     </div>
-
                 </div>
             </div>
             <div style={{
@@ -275,7 +291,10 @@ function Home() {
                 flexDirection: 'row',
                 boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)'
             }}>
-                <CytoscapeWrapper resetNetworkView={resetNetworkView} graphElements={graphElements} onNodeClick={writeEntityDataToEntityInfo} />
+                <CytoscapeWrapper resetNetworkView={resetNetworkView} graphElements={graphElements}
+                    onNodeClick={writeEntityDataToEntityInfo}
+                    onEdgeClick={updateBandwidthGraph}
+                />
                 <div style={{
                     borderColor: '#555',
                     boxShadow: '0px 10px 20px 0 rgb(0 0 0 /60%)',
@@ -290,7 +309,7 @@ function Home() {
                     <GraphFilter onFilterGraph={onFilterGraph} />
                 </div>
             </div>
-            <BandwidthChart />
+            <BandwidthChart entity1={selectedInteraction.entity1} entity2={selectedInteraction.entity2} chartData={chartData} />
         </div>
     );
 }
