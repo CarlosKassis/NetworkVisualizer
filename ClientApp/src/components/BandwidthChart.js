@@ -10,7 +10,7 @@ function BandwidthChart(props) {
     const chartInstance = useRef(null);
 
     const data = {
-        labels: [1],
+        labels: [1, 2],
         datasets: [
             {
                 label: '',
@@ -36,7 +36,8 @@ function BandwidthChart(props) {
     const config = {
         type: 'bar',
         data: data,
-        options: {
+        options: {  
+            maintainAspectRatio: false,
             responsive: true,
             plugins: {
                 title: {
@@ -68,25 +69,22 @@ function BandwidthChart(props) {
         },
     };
 
-    useEffect(() => {
+    function tryInitializeChartInstance() {
         if (chartInstance.current == null) {
             if (chartContainer && chartContainer.current) {
                 const newChartInstance = new Chart(chartContainer.current, config);
                 chartInstance.current = newChartInstance;
             }
         }
+    }
+
+    useEffect(() => {
+        tryInitializeChartInstance();
     }, [chartContainer])
 
     useEffect(() => {
 
-        if (chartInstance.current == null) {
-            if (chartContainer && chartContainer.current) {
-                const newChartInstance = new Chart(chartContainer.current, config);
-                chartInstance.current = newChartInstance;
-            }
-        }
-
-        console.log(props.chartData);
+        tryInitializeChartInstance();
         if (props.chartData.length == 0) {
             return;
         }
@@ -105,7 +103,7 @@ function BandwidthChart(props) {
     }, [props.chartData]);
 
     return (
-        <div>
+        <div style={{ width:'500px', height:'500px' }}>
             <canvas style={{ height: '5px' }} ref={chartContainer} />
         </div>
     );
