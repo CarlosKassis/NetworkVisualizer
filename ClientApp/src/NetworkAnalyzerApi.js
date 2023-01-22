@@ -9,7 +9,7 @@ export function getLiveCaptureDataApi(liveCaptureId, onGetLiveCaptureData) {
 
     xhr.onload = () => {
         if (xhr.status == 200) {
-            onGetLiveCaptureData(xhr.responseText);
+            onGetLiveCaptureData(xhr.responseText, false);
         }
         else {
             return null;

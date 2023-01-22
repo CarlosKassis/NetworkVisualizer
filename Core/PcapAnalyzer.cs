@@ -243,7 +243,7 @@ namespace NetworkAnalyzer.Core
 
     public class PcapAnalyzer : IAsyncDisposable
     {
-        private const int ThreadCount = 1;
+        private const int ThreadCount = 10;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
         {
             { 20, "FTP" },
@@ -277,7 +277,6 @@ namespace NetworkAnalyzer.Core
         };
 
         private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
-        private readonly ConcurrentBag<string> _gateways = new ConcurrentBag<string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), ConcurrentInteractionData> _interactions = new ConcurrentDictionary<(string, string), ConcurrentInteractionData>();
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();

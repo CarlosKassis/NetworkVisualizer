@@ -10,13 +10,13 @@ function BandwidthChart(props) {
     const chartInstance = useRef(null);
 
     const data = {
-        labels: [1, 2],
+        labels: [0, 0],
         datasets: [
             {
                 label: '',
                 data: ["2", "4"],
                 //borderColor: 'rgb(0, 220, 255)',
-                backgroundColor: 'rgb(0, 220, 255)',
+                backgroundColor: 'rgb(50, 240, 255)',
                 //fill: {
                 //    target: 'origin',
                 //    above: 'rgb(180, 230, 255)'
@@ -39,22 +39,23 @@ function BandwidthChart(props) {
         options: {  
             maintainAspectRatio: false,
             responsive: true,
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Traffic between entities'
-                },
-            },
             interaction: {
                 intersect: false,
             },
             scales: {
                 x: {
                     display: true,
-                    title: {
-                        display: true
-                    },
-                    type: 'time'
+                    type: 'time',
+                    /*time: {
+                        unit: 'hour',
+                        format: 'h:mm',
+                        displayFormats: {
+                            hour: 'h:mm'
+                        },
+                        ticks: {
+                            source: 'data'
+                        }
+                    }*/
                 },
                 y: {
                     display: true,
@@ -103,7 +104,9 @@ function BandwidthChart(props) {
     }, [props.chartData]);
 
     return (
-        <div className={"graph-floating"} style={{ width:'500px', height:'500px' }}>
+        <div className={"graph-floating"} style={{
+            height: '200px', padding: '5px'
+        }}>
             <canvas ref={chartContainer} />
         </div>
     );

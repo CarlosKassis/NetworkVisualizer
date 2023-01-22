@@ -5,17 +5,19 @@ function CytoscapeWrapper(props) {
 
     const cyRef = useRef(null);
 
-    useEffect(() => {
-        cyRef.current.center();
-    }, [props.resetNetworkView]);
-
     const onNodeClick = (event) => {
         props.onNodeClick(event.target.data().id);
     }
 
     const onEdgeClick = (event) => {
-        props.onEdgeClick(event.target.data().index);
+        props.onEdgeClick(`${event.target.data().source}-${event.target.data().target}`);
     }
+
+    useEffect(() => {
+        if (props.graphInfo.IsInitial) {
+            cyRef.current.center();
+        }
+    }, [props.graphInfo])
 
     const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
     return (
@@ -27,8 +29,8 @@ function CytoscapeWrapper(props) {
             zIndex:'1'
         }}>
             <CytoscapeComponent minZoom={0.01} maxZoom={8} style={{ height: '100vh' }}
-                elements={props.graphElements.length ? props.graphElements : [defaultElements]}
-                //textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
+                elements={props.graphInfo.Elements.length ? props.graphInfo.Elements : [defaultElements]}
+                textureOnViewport={true} // Set true for larger graphs to make moving graph around faster
                 cy={(cy) => {
                     cyRef.current = cy;
                     cy.on('tap', 'node', onNodeClick)
