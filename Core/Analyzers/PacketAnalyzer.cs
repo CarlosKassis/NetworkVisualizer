@@ -2,7 +2,7 @@
 
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 
-namespace NetworkAnalyzer.Core
+namespace NetworkAnalyzer.Core.Analyzers
 {
     using Newtonsoft.Json;
     using PcapDotNet.Core;
@@ -13,7 +13,7 @@ namespace NetworkAnalyzer.Core
     using System.Numerics;
     using UAParser;
     using PcapDotNet.Packets.Dns;
-    using Utils.Dhcp;
+    using NetworkAnalyzer.Utils.Dhcp;
     using NetworkAnalyzer.Utils.Dhcp.Options;
     using NetworkAnalyzer.Utils.Dhcp.Enums;
     using System.Net;
@@ -55,12 +55,6 @@ namespace NetworkAnalyzer.Core
         DNS,
         Server,
         Computer
-    };
-
-    public enum CaptureType
-    {
-        Offline,
-        Live
     };
 
     class ConcurrentEntityData
@@ -211,7 +205,7 @@ namespace NetworkAnalyzer.Core
 
         public void AggregateBytes(long timestamp, long bytes)
         {
-            _bytesPerSecond.AddOrUpdate(timestamp, bytes,(key, value) => value + bytes);
+            _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
         }
 
         public ConcurrentInteractionData(long timestamp, long bytes)
@@ -258,7 +252,7 @@ namespace NetworkAnalyzer.Core
         }
     }
 
-    public class PcapAnalyzer : IAsyncDisposable
+    public class PacketAnalyzer : IAsyncDisposable
     {
         private const int ThreadCount = 10;
         private static readonly Dictionary<ushort, string> TcpPortToServiceName = new Dictionary<ushort, string>()
@@ -300,35 +294,27 @@ namespace NetworkAnalyzer.Core
         private readonly List<Packet> _packets = new List<Packet>();
         private readonly string? _filePath;
         private readonly Parser _userAgentParser = Parser.GetDefault();
-        private readonly PacketCommunicator _packetCommunicator;
-        private readonly Task _packetSniffTask;
-        private readonly CaptureType _captureType; // TODO: use inheritance
+        private PacketCommunicator? _packetCommunicator;
+        private Task? _packetSniffTask;
 
-        // Offline packet capture
-        public PcapAnalyzer(CaptureType captureType, string filePath = null, string nicDesc = null)
+        // OnSniff - Good for workflows that involves constant polling for analysis
+        // Aggregate - Good for workflows that invlove polling for analysis once or very few often
+        public enum PacketAnalysisTiming
         {
-            _captureType = captureType;
-            _filePath = filePath;
-
-            if (captureType == CaptureType.Offline)
-            {
-                // Optimization: add BPF filters
-                OfflinePacketDevice captureFileDevice = new OfflinePacketDevice(_filePath);
-                _packetCommunicator = captureFileDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-                _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AggregatePacketToMemory));
-            }
-            else
-            {
-                var avaliableCaptureDevices = LivePacketDevice.AllLocalMachine;
-                var wifiCard = avaliableCaptureDevices.First(device => device.Description.Equals(nicDesc)); // Choose my WiFi card
-                _packetCommunicator = wifiCard.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-                _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, AnalyzePacket));
-            }
+            OnSniff,
+            Aggregate
         }
 
-        public async Task<string> GenerateCytoscapeGraphJson()
+        // Offline packet capture
+        public void Initialize(PacketDevice packetDevice, PacketAnalysisTiming packetAnalysisTiming)
         {
-            if (_captureType == CaptureType.Offline)
+            _packetCommunicator = packetDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
+            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, packetAnalysisTiming == PacketAnalysisTiming.Aggregate ? AggregatePacketToMemory : AnalyzePacket));
+        }
+
+        public async Task<string> GetCytoscapeGraphJson(bool waitForPacketDeviceEof)
+        {
+            if (waitForPacketDeviceEof)
             {
                 // Wait for file read
                 await _packetSniffTask;
@@ -343,9 +329,11 @@ namespace NetworkAnalyzer.Core
 
         private float SubnetCircleRadiusOnGraph(int subnetEntityCount)
         {
-            return (float)Math.Sqrt(subnetEntityCount) * 100f; 
+            return (float)Math.Sqrt(subnetEntityCount) * 100f;
         }
 
+
+        // TODO: move to class
         private string GenerateCytoscapeGraphJsonFromAnalysis()
         {
             // Generate circle coordinates for subnets
@@ -408,7 +396,7 @@ namespace NetworkAnalyzer.Core
                 Interactions = _interactions.ToList()
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item1, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item2, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
-                .Select(interaction => new object[] { new string[] { interaction.Key.Item1, interaction.Key.Item2 }, interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value}) }),
+                .Select(interaction => new object[] { new string[] { interaction.Key.Item1, interaction.Key.Item2 }, interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value }) }),
 
                 EntityPositions = subnetEntityPositions,
                 Subnets = _subnets.ToList().Select(kvp => new object[] { kvp.Key, kvp.Value })
@@ -427,35 +415,37 @@ namespace NetworkAnalyzer.Core
         private async Task DoFinalDataProcessing(int threadCount)
         {
             var entities = _entities.ToArray();
-            int chunkSize = entities.Length / threadCount + 1;
-            var firstPass = (ConcurrentEntityData data) => DoFinalDataProcessingOnEntityFirstPass(data);
-            var secondPass = (ConcurrentEntityData data) => DoFinalDataProcessingOnEntitySecondPass(data);
+            var firstPass = DoFinalDataProcessingOnEntityFirstPass;
+            var secondPass = DoFinalDataProcessingOnEntitySecondPass;
 
-            new List<Action<ConcurrentEntityData>> { firstPass, secondPass }
-            .ForEach(async action => await Task.WhenAll(
-                Enumerable.Range(0, threadCount)
-                .Select(i =>
+            var passes = new List<Action<ConcurrentEntityData>> { firstPass, secondPass };
+            foreach(var pass in passes)
             {
-                return Task.Run(() =>
+                await Task.WhenAll(Enumerable.Range(0, threadCount)
+                .Select(chunkIndex =>
                 {
-                    int start = i * chunkSize;
-                    int end = i * chunkSize + chunkSize;
-                    for (int i = start; i < end; i++)
+                    return Task.Run(() =>
                     {
-                        if (i >= entities.Length)
+                        int chunkSize = entities.Length / threadCount + 1;
+                        int start = chunkIndex * chunkSize;
+                        int end = chunkIndex * chunkSize + chunkSize;
+                        for (int i = start; i < end; i++)
                         {
-                            break;
-                        }
+                            if (i >= entities.Length)
+                            {
+                                break;
+                            }
 
-                        action(entities[i].Value);
-                    }
-                });
-            })));
+                            pass(entities[i].Value);
+                        }
+                    });
+                }));
+            }
         }
 
         private void DoFinalDataProcessingOnEntityFirstPass(ConcurrentEntityData data)
         {
-            if (data.GetServices().Any(service => ServicesThatMakeYouAServer.Contains(service)))
+            if (data.GetServices().Any(ServicesThatMakeYouAServer.Contains))
             {
                 // Entity provides services that are server-like
                 data.TrySetTypeAndMarkAvailableServices(EntityType.Server);

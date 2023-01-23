@@ -1,8 +1,8 @@
 ﻿
 namespace NetworkAnalyzer.Controllers
 {
+    using NetworkAnalyzer.Core.Analyzers;
     using Microsoft.AspNetCore.Mvc;
-    using NetworkAnalyzer.Core;
     using Newtonsoft.Json;
     using PcapDotNet.Core;
     using System.Collections.Concurrent;
@@ -17,7 +17,7 @@ namespace NetworkAnalyzer.Controllers
 
         private static readonly string PcapUploadPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "PcapUpload");
 
-        private static readonly ConcurrentDictionary<string, (DateTime Timestamp, PcapAnalyzer Analyzer)> _liveCaptureIdToPcapAnalyzer = new ConcurrentDictionary<string, (DateTime, PcapAnalyzer)>();
+        private static readonly ConcurrentDictionary<string, (DateTime Timestamp, LivePacketAnalyzer Analyzer)> _liveCaptureIdToPacketAnalyzer = new ConcurrentDictionary<string, (DateTime, LivePacketAnalyzer)>();
 
         private static Task _idleCapturesDisposerTask;
 
@@ -32,7 +32,7 @@ namespace NetworkAnalyzer.Controllers
                 {
                     while (true)
                     {
-                        var runningLiveCaptures = _liveCaptureIdToPcapAnalyzer.ToList();
+                        var runningLiveCaptures = _liveCaptureIdToPacketAnalyzer.ToList();
                         foreach (var liveCapture in runningLiveCaptures)
                         {
                             if (liveCapture.Value.Timestamp + LiveCaptureKillAfterIdleTime <= DateTime.Now)
@@ -71,8 +71,8 @@ namespace NetworkAnalyzer.Controllers
                     }
                 }
 
-                PcapAnalyzer pcapAnalyzer = new PcapAnalyzer(CaptureType.Offline, filePath: filePath);
-                string graphJson = await pcapAnalyzer.GenerateCytoscapeGraphJson();
+                OfflinePacketAnalyzer packetAnalyzer = new OfflinePacketAnalyzer(filePath);
+                string graphJson = await packetAnalyzer.GetCytoscapeGraphJson();
 
                 // Delete file
                 try
@@ -108,8 +108,8 @@ namespace NetworkAnalyzer.Controllers
             }
 
             var liveCaptureGuid = Guid.NewGuid();
-            var livePcapAnalyzer = new PcapAnalyzer(CaptureType.Live, nicDesc: nicDesc);
-            _liveCaptureIdToPcapAnalyzer[liveCaptureGuid.ToString()] = (DateTime.Now, livePcapAnalyzer);
+            var livePacketAnalyzer = new LivePacketAnalyzer(nicDesc);
+            _liveCaptureIdToPacketAnalyzer[liveCaptureGuid.ToString()] = (DateTime.Now, livePacketAnalyzer);
             Console.WriteLine($"Started live capture ID: {liveCaptureGuid}");
             return Content(liveCaptureGuid.ToString());
         }
@@ -118,18 +118,18 @@ namespace NetworkAnalyzer.Controllers
         public async Task<IActionResult> GetLivePacketCaptureData(string liveCaptureId)
         {
             // TODO: throw + exception handler middleware
-            if (!_liveCaptureIdToPcapAnalyzer.TryGetValue(liveCaptureId, out var liveCapture))
+            if (!_liveCaptureIdToPacketAnalyzer.TryGetValue(liveCaptureId, out var liveCapture))
             {
                 return StatusCode(404, $"Live capture with ID '{liveCaptureId}' wasn't found.");
             }
 
             // Refresh idle time before calculation
             var timeRefreshedCaptureData = (DateTime.Now, liveCapture.Analyzer);
-            _liveCaptureIdToPcapAnalyzer.TryUpdate(liveCaptureId, timeRefreshedCaptureData, liveCapture);
-            var networkInfoJson = await liveCapture.Analyzer.GenerateCytoscapeGraphJson();
+            _liveCaptureIdToPacketAnalyzer.TryUpdate(liveCaptureId, timeRefreshedCaptureData, liveCapture);
+            var networkInfoJson = await liveCapture.Analyzer.GetCytoscapeGraphJson();
 
             // Refresh idle time also after calculation
-            _liveCaptureIdToPcapAnalyzer.TryUpdate(liveCaptureId, (DateTime.Now, liveCapture.Analyzer), timeRefreshedCaptureData);
+            _liveCaptureIdToPacketAnalyzer.TryUpdate(liveCaptureId, (DateTime.Now, liveCapture.Analyzer), timeRefreshedCaptureData);
 
             return Content(networkInfoJson);
         }
@@ -138,7 +138,7 @@ namespace NetworkAnalyzer.Controllers
         public async Task<IActionResult> StopLivePacketCapture(string liveCaptureId)
         {
             // TODO: throw + exception handler middleware
-            if (!_liveCaptureIdToPcapAnalyzer.TryGetValue(liveCaptureId, out _))
+            if (!_liveCaptureIdToPacketAnalyzer.TryGetValue(liveCaptureId, out _))
             {
                 return StatusCode(404, $"Live capture with ID '{liveCaptureId}' wasn't found.");
             }
@@ -157,8 +157,8 @@ namespace NetworkAnalyzer.Controllers
 
         private static async Task DisposeLivePacketCapture(string liveCaptureId)
         {
-            await _liveCaptureIdToPcapAnalyzer[liveCaptureId].Analyzer.DisposeAsync();
-            _liveCaptureIdToPcapAnalyzer.Remove(liveCaptureId, out _);
+            await _liveCaptureIdToPacketAnalyzer[liveCaptureId].Analyzer.DisposeAsync();
+            _liveCaptureIdToPacketAnalyzer.Remove(liveCaptureId, out _);
             Console.WriteLine($"Disposed live capture ID: {liveCaptureId}");
         }
     }
