@@ -42,6 +42,7 @@ namespace NetworkAnalyzer.Core
     {
         FromActiveDirectory,
         FromSubnet,
+        FromOtherMachinesHostnamesInSubnet, // TODO: remove
         None
     }
 
@@ -67,7 +68,7 @@ namespace NetworkAnalyzer.Core
         private OsSetPriority _osSetPriority = OsSetPriority.None;
         private MacSetPriority _macSetPriority = MacSetPriority.None;
         private DomainSetPriority _domainSetPriority = DomainSetPriority.None;
-
+        private IPAddress _ipAddress;
 
         public object _lock = new object();
 
@@ -87,6 +88,7 @@ namespace NetworkAnalyzer.Core
         {
             Type = EntityType.Computer;
             Ip = ip;
+            _ipAddress = IPAddress.Parse(ip);
 
             var ipParts = ip.Split('.');
             Subnet = $"{ipParts[0]}.{ipParts[1]}.{ipParts[2]}.0/24";
@@ -212,10 +214,6 @@ namespace NetworkAnalyzer.Core
             _bytesPerSecond.AddOrUpdate(timestamp, bytes,(key, value) => value + bytes);
         }
 
-        public ConcurrentInteractionData()
-        {
-        }
-
         public ConcurrentInteractionData(long timestamp, long bytes)
         {
             _bytesPerSecond[timestamp] = bytes;
@@ -224,20 +222,39 @@ namespace NetworkAnalyzer.Core
 
     class ConcurrentSubnetData
     {
+        public enum HostnameSetPriority
+        {
+            FromDHCP,
+            FromOneOfTheMachinesUri,
+            None
+        }
+
+        private object _lock = new object();
+        private HostnameSetPriority _hostnameSetPriority = HostnameSetPriority.None;
         private IPNetwork _network;
 
         public string? Domain { get; private set; }
 
-        public ConcurrentSubnetData(string subnet,string? domain)
+        public ConcurrentSubnetData(string subnet)
         {
             _network = IPNetwork.Parse(subnet);
-
-            Domain = domain;
         }
 
         public bool IsIpInSubnet(string ip)
         {
             return _network.Contains(IPAddress.Parse(ip));
+        }
+
+        public void SetDomain(string domain, HostnameSetPriority hostnameSetPriority)
+        {
+            lock (_lock)
+            {
+                if (hostnameSetPriority <= _hostnameSetPriority)
+                {
+                    _hostnameSetPriority = hostnameSetPriority;
+                    Domain = domain;
+                }
+            }
         }
     }
 
@@ -411,7 +428,13 @@ namespace NetworkAnalyzer.Core
         {
             var entities = _entities.ToArray();
             int chunkSize = entities.Length / threadCount + 1;
-            await Task.WhenAll(Enumerable.Range(0, threadCount).Select(i =>
+            var firstPass = (ConcurrentEntityData data) => DoFinalDataProcessingOnEntityFirstPass(data);
+            var secondPass = (ConcurrentEntityData data) => DoFinalDataProcessingOnEntitySecondPass(data);
+
+            new List<Action<ConcurrentEntityData>> { firstPass, secondPass }
+            .ForEach(async action => await Task.WhenAll(
+                Enumerable.Range(0, threadCount)
+                .Select(i =>
             {
                 return Task.Run(() =>
                 {
@@ -424,20 +447,43 @@ namespace NetworkAnalyzer.Core
                             break;
                         }
 
-                        if (entities[i].Value.GetServices().Any(service => ServicesThatMakeYouAServer.Contains(service)))
-                        {
-                            // Entity provides services that are server-like
-                            entities[i].Value.TrySetTypeAndMarkAvailableServices(EntityType.Server);
-                        }
-
-                        ConcurrentSubnetData? subnetThatContainsEntityIp = _subnets.FirstOrDefault(subnet => subnet.Value.IsIpInSubnet(entities[i].Key)).Value;
-                        if (subnetThatContainsEntityIp != null && subnetThatContainsEntityIp.Domain != null)
-                        {
-                            entities[i].Value.SetDomain(subnetThatContainsEntityIp.Domain, DomainSetPriority.FromSubnet);
-                        }
+                        action(entities[i].Value);
                     }
                 });
-            }));
+            })));
+        }
+
+        private void DoFinalDataProcessingOnEntityFirstPass(ConcurrentEntityData data)
+        {
+            if (data.GetServices().Any(service => ServicesThatMakeYouAServer.Contains(service)))
+            {
+                // Entity provides services that are server-like
+                data.TrySetTypeAndMarkAvailableServices(EntityType.Server);
+            }
+
+            string hostname = data.Hostname;
+            if (hostname != null && hostname.Count(c => c == '.') >= 2)
+            {
+                if (!hostname.Contains(Uri.SchemeDelimiter))
+                {
+                    hostname = string.Concat(Uri.UriSchemeHttp, Uri.SchemeDelimiter, hostname);
+                }
+
+                if (!string.IsNullOrEmpty(hostname) && Uri.TryCreate(hostname, UriKind.Absolute, out Uri? uri))
+                {
+                    _subnets.TryAdd(data.Subnet, new ConcurrentSubnetData(data.Subnet));
+                    _subnets[data.Subnet].SetDomain(uri.Host, ConcurrentSubnetData.HostnameSetPriority.FromOneOfTheMachinesUri);
+                }
+            }
+        }
+
+        private void DoFinalDataProcessingOnEntitySecondPass(ConcurrentEntityData data)
+        {
+            ConcurrentSubnetData? subnetThatContainsEntityIp = _subnets.FirstOrDefault(subnet => subnet.Value.IsIpInSubnet(data.Ip)).Value;
+            if (subnetThatContainsEntityIp != null && subnetThatContainsEntityIp.Domain != null)
+            {
+                data.SetDomain(subnetThatContainsEntityIp.Domain, DomainSetPriority.FromSubnet);
+            }
         }
 
         private async Task AnalyzeAggregatedPacketsInParallel(int threadCount)
@@ -686,7 +732,11 @@ namespace NetworkAnalyzer.Core
             // Add subnet to gathered subnets
             var subnet = $"{AddressUtils.IpBytesToString(subnetIpBytes)}/{AddressUtils.MaskAddressToMaskNumber(subnetMaskAddress)}";
             var subnetDomain = ((DHCPOptionDomainName)dhcp.options.FirstOrDefault(x => x is DHCPOptionDomainName mask))?.DomainName;
-            _subnets.TryAdd(subnet, new ConcurrentSubnetData(subnet, subnetDomain));
+            _subnets.TryAdd(subnet, new ConcurrentSubnetData(subnet));
+            if (subnetDomain != null)
+            {
+                _subnets[subnet].SetDomain(subnetDomain, ConcurrentSubnetData.HostnameSetPriority.FromDHCP);
+            }
 
             // Add routers info`
             ((DHCPOptionRouter)dhcp.options.FirstOrDefault(x => x is DHCPOptionRouter))?.Routers?

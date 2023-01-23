@@ -15,13 +15,14 @@ function BandwidthChart(props) {
             {
                 label: '',
                 data: ["2", "4"],
-                //borderColor: 'rgb(0, 220, 255)',
+                borderColor: 'rgb(0, 220, 255)',
                 backgroundColor: 'rgb(50, 240, 255)',
-                //fill: {
-                //    target: 'origin',
-                //    above: 'rgb(180, 230, 255)'
-                //},
-                tension: 0.1
+                fill: {
+                    target: 'origin',
+                    above: 'rgb(180, 230, 255)'
+                },
+                lineTension: 0.1,
+                cubicInterpolationMode: 'bezier'
             },
             /*{
                 label: 'Cubic interpolation',
@@ -46,16 +47,11 @@ function BandwidthChart(props) {
                 x: {
                     display: true,
                     type: 'time',
-                    /*time: {
-                        unit: 'hour',
-                        format: 'h:mm',
-                        displayFormats: {
-                            hour: 'h:mm'
-                        },
+                    time: {
                         ticks: {
-                            source: 'data'
+                            source: 'auto'
                         }
-                    }*/
+                    }
                 },
                 y: {
                     display: true,
@@ -105,7 +101,7 @@ function BandwidthChart(props) {
 
     return (
         <div className={"graph-floating"} style={{
-            height: '200px', padding: '5px'
+            height: '200px', padding: '5px', width: '100%'
         }}>
             <canvas ref={chartContainer} />
         </div>
