@@ -1,8 +1,7 @@
 # NetworkVisualizer
-A web based project that uses ASP.NET backend and React frontend to visual network topology based on packets read from offline packet capture file or *realtime network capture device.
+A web based project that uses ASP.NET backend and React frontend to visual network topology based on packets read from offline packet capture file or realtime from NIC.
 <br /><br />
-*Realtime packet capture option is a work in progress..
 
-![image](https://user-images.githubusercontent.com/26511261/213110969-579b269f-205b-4d89-ba73-c5e7ede96466.png)
+![image](https://user-images.githubusercontent.com/26511261/213912940-beb7acc2-3c6d-4c62-9f18-58c2b2ac6360.png)
 
-Images used from https://www.flaticon.com/
+Icons used from https://www.flaticon.com/
