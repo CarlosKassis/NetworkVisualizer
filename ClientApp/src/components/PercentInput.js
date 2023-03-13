@@ -14,7 +14,6 @@ function PercentInput(props) {
             return;
         }
 
-        //extractPercentageFromString('60%')
         setInitialized(true);
 
         const storedFilter = getStoredFilter(props.filterType);
@@ -47,7 +46,7 @@ function PercentInput(props) {
 
     return (
         <div>
-            <h5><b>{`${props.title}:`}</b></h5>
+            <h5>{`${props.title}:`}</h5>
             <div className={"flex-cyber"}>
                 <input ref={filterInput} onChange={handleInputChange} style={{ width: '100px' }} />
             </div>

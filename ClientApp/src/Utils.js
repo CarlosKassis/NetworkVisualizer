@@ -89,7 +89,41 @@ export function getStoredFilter(filterType) {
     return storedFilter;
 }
 
+// Extract percentile
 export function parsePercentage(str) {
-    var percentileString = input.replace('%', '');
-    return parseFloat(percentileString);
+    return getNumberWithoutFinalCharAndWhitespace(str, '%');
+}
+
+// Convert string to seconds
+export function parseTime(str) {
+
+    var time = getNumberWithoutFinalCharAndWhitespace(str.toLowerCase(), 's');
+    if (!isNaN(time)) {
+        return time;
+    }
+
+    time = getNumberWithoutFinalCharAndWhitespace(str.toLowerCase(), 'm');
+    if (!isNaN(time)) {
+        return time * 60;
+    }
+
+    time = getNumberWithoutFinalCharAndWhitespace(str.toLowerCase(), 'h');
+    if (!isNaN(time)) {
+        return time * 60 * 60;
+    }
+
+    time = getNumberWithoutFinalCharAndWhitespace(str.toLowerCase(), 'd');
+    if (!isNaN(time)) {
+        return time * 60 * 60 * 24;
+    }
+
+    return NaN;
+}
+
+function getNumberWithoutFinalCharAndWhitespace(str, finalChar) {
+    if (!str.endsWith(finalChar)) {
+        return NaN;
+    }
+
+    return parseFloat(str.substring(0, str.length - 1).trimEnd());
 }

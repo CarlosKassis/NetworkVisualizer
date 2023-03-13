@@ -47,7 +47,7 @@ function NewConnections(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
             <h4><b>New Connections</b></h4>
-            <PercentOrTimeInput title={"Baseline [%,s,m,h,d]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentOrTimeInput>
+            <PercentOrTimeInput maxTime={3 * 24 * 3600} title={"Baseline [%,s,m,h,d]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentOrTimeInput>
             <button className={"btn-cyber"} onClick={onClickFilter}><b>Find</b></button>
         </div>
     );
