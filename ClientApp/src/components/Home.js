@@ -8,6 +8,8 @@ import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
 import BandwidthChart from './BandwidthChart';
+import NewConnections from './NewConnections';
+import TrafficIncrease from './TrafficIncrease';
 
 function Home() {
 
@@ -302,32 +304,37 @@ function Home() {
                     onNodeClick={writeEntityDataToEntityInfo}
                     onEdgeClick={onEdgeClick}
                 />
+
+                <div style={{
+                    wordWrap: 'break-word',
+                    maxWidth: '400px',
+                    height: '100%'
+                }}>
+                    <EntityInfo entityInfo={entityInfo} />
+                    <GraphFilter onFilterGraph={onFilterGraph} />
+                    <NewConnections onFilterGraph={onFilterGraph} />
+                    <TrafficIncrease onFilterGraph={onFilterGraph} />
+                </div>
+
                 <div className={"flex-cyber"} style={{ height: 'fit-content' }}>
 
-                    <div className={"graph-floating"} style={{ height: 'fit-content' }}>
-                        <FileUploadSingle onCallback={onFileUpload} />
-                    </div>
-
-                    <div className={"graph-floating"} style={{ height: 'fit-content' }}>
-                        <div className={"flex-cyber"}>
-                            <button className={"btn-cyber"} onClick={() => startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse)}>Capture</button>
-                            <button className={"btn-cyber"} onClick={stopLiveCapture}>Stop</button>
+                    <div>
+                        <div className={"graph-floating"} style={{ height: 'fit-content' }}>
+                            <FileUploadSingle onCallback={onFileUpload} />
                         </div>
-                        <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
+
+                        <div className={"graph-floating"} style={{ height: 'fit-content' }}>
+                            <div className={"flex-cyber"}>
+                                <button className={"btn-cyber"} onClick={() => startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse)}>Capture</button>
+                                <button className={"btn-cyber"} onClick={stopLiveCapture}>Stop</button>
+                            </div>
+                            <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
+                        </div>
                     </div>
 
                     <BandwidthChart className={"graph-floating"} chartData={chartData} entity1={selectedInteraction.Entity1} entity2={selectedInteraction.Entity2} />
 
                 </div>
-            </div>
-
-            <div style={{
-                wordWrap: 'break-word',
-                maxWidth: '400px',
-                height: '100%'
-            }}>
-                <EntityInfo entityInfo={entityInfo} />
-                <GraphFilter onFilterGraph={onFilterGraph} />
             </div>
 
         </div>

@@ -88,3 +88,8 @@ export function getStoredFilter(filterType) {
 
     return storedFilter;
 }
+
+export function parsePercentage(str) {
+    var percentileString = input.replace('%', '');
+    return parseFloat(percentileString);
+}
