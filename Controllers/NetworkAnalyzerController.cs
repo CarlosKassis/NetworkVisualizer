@@ -154,6 +154,11 @@ namespace NetworkAnalyzer.Controllers
             return Content(JsonConvert.SerializeObject(nics.Select(nic => nic.Description)));
         }
 
+        [HttpGet("live/stop")]
+        public async Task<IActionResult> GetNewConnections(int startTimestamp, int endTimestamp, [FromBody] int[][] interaction)
+        {
+            return Ok();
+        }
 
         private static async Task DisposeLivePacketCapture(string liveCaptureId)
         {
@@ -161,5 +166,7 @@ namespace NetworkAnalyzer.Controllers
             _liveCaptureIdToPacketAnalyzer.Remove(liveCaptureId, out _);
             Console.WriteLine($"Disposed live capture ID: {liveCaptureId}");
         }
+
+        //private class NewConnections
     }
 }

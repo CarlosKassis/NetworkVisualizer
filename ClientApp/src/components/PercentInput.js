@@ -50,7 +50,7 @@ function PercentInput(props) {
             <div className={"flex-cyber"}>
                 <input ref={filterInput} onChange={handleInputChange} style={{ width: '100px' }} />
             </div>
-            {validInput ? <br /> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>Valid Input: 60% / 50s / 30m / 2.4h / 7.3d ...</b></p>}
+            {validInput ? <br /> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>Valid Input: X%</b></p>}
         </div>
     );
 }

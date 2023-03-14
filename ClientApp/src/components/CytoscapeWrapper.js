@@ -42,12 +42,18 @@ function CytoscapeWrapper(props) {
                             'height': '50px'
                         },
                     },
-
                     {
                         selector: 'edge',
                         style: {
                             'width': '1.5px',
                             'line-color': '#777'
+                        }
+                    },
+                    {
+                        selector: 'edge-new-connection',
+                        style: {
+                            'width': '4px',
+                            'line-color': '#700'
                         }
                     }
                 ]} />

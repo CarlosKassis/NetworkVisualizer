@@ -13,13 +13,15 @@ import TrafficIncrease from './TrafficIncrease';
 
 function Home() {
 
-    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
+    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [], NewConnections: new Set() });
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
     const interactions = useRef([]);
 
     const [entityInfo, setEntityInfo] = useState({ ip: null, os: null, mac: null, hostname: null, domain: null, services: null });
     const [subnetFilter, setSubnetFilter] = useState({ inclusion: [], exclusion: [] });
+    const [captureLength, setCaptureLength] = useState(60);
+
     const [nics, setNics] = useState([]);
     const [selectedNic, setSelectedNic] = useState('');
     const [chartData, setChartData] = useState([1]);
@@ -140,6 +142,7 @@ function Home() {
     function onReceiveNetworkInfoJson(json)
     {
         const networkInfo = JSON.parse(json);
+
         if (!networkInfo) {
             // TODO: show error
             return;
@@ -153,11 +156,11 @@ function Home() {
         setEntityToData(entityDictionary);
 
         const newFullGraphElements = generateGraphElements(networkInfo);
-        console.log(`${fullGraphInfo.Elements.length}, ${newFullGraphElements.length}`);
-        setFullGraphInfo({ IsInitial: fullGraphInfo.Elements.length == 0, Elements: newFullGraphElements });
+
+        setFullGraphInfo({ IsInitial: fullGraphInfo.Elements.length == 0, Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
         interactionKeyToData.current = {};
         for (const interaction of networkInfo.Interactions) {
-            interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])] = interaction[1];
+            interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])] = [interaction[1], interaction[2]];
         }
 
         updateBandwidthGraph();
@@ -238,8 +241,15 @@ function Home() {
         }
 
         for (const interaction of networkInfo.Interactions) {
-            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge' });
+            if (newConnectionsAfterBaseline.has(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))) {
+                elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge-new-connection' });
+            }
+            else {
+                elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge' });
+            }
         }
+
+        setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
 
         interactions.current = networkInfo.Interactions;
 
@@ -264,7 +274,7 @@ function Home() {
 
         var newChartData = [];
 
-        const bytesPerSeconds = interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction.Entity1, selectedInteraction.Entity2)];
+        const bytesPerSeconds = interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction.Entity1, selectedInteraction.Entity2)][0];
         for (const byteCount of bytesPerSeconds) {
             newChartData.push(byteCount);
         }
@@ -277,7 +287,7 @@ function Home() {
     }
 
     function resetFullGraphInfo() {
-        setFullGraphInfo({ "IsInitial": true, "Elements": [] });
+        setFullGraphInfo({ IsInitial: true, Elements: [] });
     }
 
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
@@ -296,6 +306,20 @@ function Home() {
         liveCapture.current = { Id: null, Running: false };
     }
 
+    // baseline: integer of seconds 
+    function onClickFindNewConnections(baseline) {
+        const newNewConnections = new Set();
+
+        for (const interaction of interactions.current) {
+            // interaction[2] = interaction first packet timestamp
+            if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + baseline) {
+                newNewConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
+            }
+        }
+
+        setFullGraphInfo({ IsInitial: fullGraphInfo.IsInitial, Elements: fullGraphInfo.Elements, NewConnections: newNewConnections });
+    }
+
     return (
         <div style={{ fontFamily: 'Arial !important', height: '90vh' }}>
 
@@ -312,8 +336,8 @@ function Home() {
                 }}>
                     <EntityInfo entityInfo={entityInfo} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
-                    <NewConnections onFilterGraph={onFilterGraph} />
-                    <TrafficIncrease onFilterGraph={onFilterGraph} />
+                    <NewConnections onSubmit={onClickFindNewConnections} captureLength={captureLength} onFilterGraph={onFilterGraph} />
+                    <TrafficIncrease captureLength={captureLength} onFilterGraph={onFilterGraph} />
                 </div>
 
                 <div className={"flex-cyber"} style={{ height: 'fit-content' }}>

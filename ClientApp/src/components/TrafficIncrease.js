@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import IpFilter from './IpFilter';
 import PercentOrTimeInput from './PercentOrTimeInput';
 import './Cyber.css'
 import { isValidFilter, getStoredFilter } from '../Utils'
@@ -48,7 +47,7 @@ function TrafficIncrease(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
             <h4><b>Traffic Increase</b></h4>
-            <PercentOrTimeInput maxTime={3 * 24 * 3600} title={"Interval [%,s,m,h,d]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentOrTimeInput>
+            <PercentOrTimeInput captureLength={props.captureLength} title={"Interval [%,s,m,h,d]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentOrTimeInput>
             <PercentInput title={"Change [%]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentInput>
             <button className={"btn-cyber"} onClick={onClickFilter}><b>Find</b></button>
         </div>

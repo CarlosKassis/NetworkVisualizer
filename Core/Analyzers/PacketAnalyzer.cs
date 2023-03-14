@@ -201,16 +201,23 @@ namespace NetworkAnalyzer.Core.Analyzers
 
     class ConcurrentInteractionData
     {
+        public long FirstPacketTimestamp { get; private set; } = long.MaxValue;
+        public long LastPacketTimestamp { get; private set; } = long.MinValue;
+
         public readonly ConcurrentDictionary<long, long> _bytesPerSecond = new ConcurrentDictionary<long, long>();
 
         public void AggregateBytes(long timestamp, long bytes)
         {
             _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
+            FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
+            LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
         }
 
         public ConcurrentInteractionData(long timestamp, long bytes)
         {
             _bytesPerSecond[timestamp] = bytes;
+            FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
+            LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
         }
     }
 
@@ -292,7 +299,7 @@ namespace NetworkAnalyzer.Core.Analyzers
         private readonly ConcurrentDictionary<(string, string), ConcurrentInteractionData> _interactions = new ConcurrentDictionary<(string, string), ConcurrentInteractionData>();
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
         private readonly List<Packet> _packets = new List<Packet>();
-        private readonly string? _filePath;
+
         private readonly Parser _userAgentParser = Parser.GetDefault();
         private PacketCommunicator? _packetCommunicator;
         private Task? _packetSniffTask;
@@ -396,10 +403,17 @@ namespace NetworkAnalyzer.Core.Analyzers
                 Interactions = _interactions.ToList()
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item1, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
                 .Where(interaction => _entities.TryGetValue(interaction.Key.Item2, out ConcurrentEntityData data) && !data.IsABroadcastAddress())
-                .Select(interaction => new object[] { new string[] { interaction.Key.Item1, interaction.Key.Item2 }, interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value }) }),
+                .Select(interaction => new object[]
+                { 
+                    new string[] { interaction.Key.Item1, interaction.Key.Item2 },
+                    interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value }),
+                    interaction.Value.FirstPacketTimestamp
+                }),
 
                 EntityPositions = subnetEntityPositions,
-                Subnets = _subnets.ToList().Select(kvp => new object[] { kvp.Key, kvp.Value })
+                Subnets = _subnets.ToList().Select(kvp => new object[] { kvp.Key, kvp.Value }),
+                CaptureStartTimestamp = _interactions.Any() ? _interactions.ToList().Select(interaction => interaction.Value.FirstPacketTimestamp).Min() : 0,
+                CaptureEndTimestamp = _interactions.Any() ? _interactions.ToList().Select(interaction => interaction.Value.LastPacketTimestamp).Max() : 0
             };
 
             return JsonConvert.SerializeObject(graphClass);
@@ -649,7 +663,6 @@ namespace NetworkAnalyzer.Core.Analyzers
 
         private void TryExtractDHCPInfo(Packet packet)
         {
-            return;
             if (!packet.IsUdp())
             {
                 return;

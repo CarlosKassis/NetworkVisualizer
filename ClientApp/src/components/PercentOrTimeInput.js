@@ -20,7 +20,7 @@ function PercentOrTimeInput(props) {
                 return;
             }
 
-            onValidTime(props.maxTime * percentage / 100.0)
+            onValidTime(props.captureLength * percentage / 100.0)
             return;
         }
 
@@ -60,18 +60,26 @@ function PercentOrTimeInput(props) {
         }
 
         if (seconds < 60) {
-            return `${seconds}s`
+            return `${numberToPrettyString(seconds)}s`
         }
 
         if (seconds < 60 * 60) {
-            return `${seconds / (60)}m`
+            return `${numberToPrettyString(seconds / 60)}m`
         }
 
         if (seconds < 60 * 60 * 24) {
-            return `${seconds / (60 * 60)}h`
+            return `${numberToPrettyString(seconds / (60 * 60))}h`
         }
 
-        return `${seconds / (60 * 60 * 24)}d`
+        return `${numberToPrettyString(seconds / (60 * 60 * 24))}d`
+    }
+
+    function numberToPrettyString(number) {
+        if (`${number}`.includes('.')) {
+            return `${number.toFixed(1)}`;
+        }
+
+        return `${number}`;
     }
 
     return (
@@ -79,7 +87,7 @@ function PercentOrTimeInput(props) {
             <h5 style={{ marginTop: '10px' }}>{`${props.title}:`}</h5>
             <div className={"flex-cyber"}>
                 <input onChange={handleInputChange} style={{ width: '100px', marginTop: '5px' }} />
-                <h6 style={{ marginTop: '7px', marginLeft: '10px' }}><b>{`${secondsToTimeString(time)}/${secondsToTimeString(props.maxTime)}`}</b></h6>
+                <h6 style={{ marginTop: '7px', marginLeft: '10px' }}><b>{`${secondsToTimeString(time)}/${secondsToTimeString(props.captureLength)}`}</b></h6>
             </div>
             {errorMessage == '' ? <br/> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>{errorMessage}</b></p>}
         </div>
