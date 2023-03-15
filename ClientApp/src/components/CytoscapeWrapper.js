@@ -43,19 +43,26 @@ function CytoscapeWrapper(props) {
                         },
                     },
                     {
+                        selector: '.edge',
+                        style: {
+                            'width': '4px',
+                            'line-color': '#222'
+                        }
+                    },
+                    {
                         selector: '.edgenewconnection',
                         style: {
-                            'width': '3px',
+                            'width': '7px',
                             'line-color': '#a00'
                         }
                     },
                     {
-                        selector: '.edge',
+                        selector: '.edgetrafficincrease',
                         style: {
-                            'width': '3px',
-                            'line-color': '#222'
+                            'width': '7px',
+                            'line-color': '#0f0'
                         }
-                    },
+                    }
                 ]} />
         </div>
     );

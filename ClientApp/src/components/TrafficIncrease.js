@@ -10,7 +10,7 @@ function TrafficIncrease(props) {
     const increase = useRef(null);
 
     function onClickFind() {
-        if (interval.current == null) {
+        if (interval.current === null || increase.current === null) {
             return;
         }
 
@@ -20,8 +20,8 @@ function TrafficIncrease(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
             <h4><b>Traffic Increase</b></h4>
-            <PercentOrTimeInput captureLength={props.captureLength} title={"Interval [%,s,m,h,d]"} onValidInput={(time) => interval.current = time}></PercentOrTimeInput>
-            <PercentInput title={"Change [%]"} onValidInput={(ratio) => increase.current = ratio}></PercentInput>
+            <PercentOrTimeInput captureLength={props.captureLength} title={"Interval [%,s,m,h,d]"} onInputChange={(time) => interval.current = time}></PercentOrTimeInput>
+            <PercentInput title={"Change [%]"} onInputChange={(ratio) => increase.current = ratio}></PercentInput>
             <button className={"btn-cyber"} onClick={onClickFind}><b>Find</b></button>
         </div>
     );

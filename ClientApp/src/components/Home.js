@@ -13,7 +13,7 @@ import TrafficIncrease from './TrafficIncrease';
 
 function Home() {
 
-    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [], NewConnectionsAfterBaseLine: new Set() });
+    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
     const [graphInfo, setGraphInfo] = useState({ Elements: [] });
 
     const [entityToData, setEntityToData] = useState(null)
@@ -48,7 +48,6 @@ function Home() {
 
     useEffect(() => {
         const graphElements = getFilteredGraphElements();
-        console.log(graphElements);
 
         cyRef.current.json({ elements: (graphElements !== [] ? graphElements : defaultElements) });
         if (fullGraphInfo.IsInitial) {
@@ -286,7 +285,7 @@ function Home() {
     }
 
     function resetFullGraphInfo() {
-        setFullGraphInfo({ IsInitial: true, Elements: [], NewConnectionsAfterBaseLine: new Set() });
+        setFullGraphInfo({ IsInitial: true, Elements: [] });
     }
 
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
@@ -307,20 +306,64 @@ function Home() {
 
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
-        const newNewConnections = new Set();
+        const newConnections = new Set();
         for (const interaction of interactions.current) {
             // interaction[2] = interaction first packet timestamp
-            console.log(`${interaction[2]}, ${fullGraphInfo.CaptureStartTimestamp} ${baseline}`);
             if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + baseline) {
-                newNewConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
+                newConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
             }
         }
+
+        const newElements = fullGraphInfo.Elements;
+        for (const element of fullGraphInfo.Elements) {
+            // Check if is edge
+            if (element.data.source !== undefined) {
+                if (newConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
+                    element.classes = "edgenewconnection";
+                }
+                else {
+                    element.classes = "edge";
+                }
+            } }
+        }
+
+        setFullGraphInfo({ IsInitial: false, Elements: newElements, CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp, CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp });
+    }
+
+    function onClickFindTrafficIncrease(interval, increase) {
+        const trafficIncreasements = new Set();
+
+        for (const interaction of interactions.current) {
+            // Index = floor((point.x - CaptureStartTime) / Interval)
+            const intervalIndexToMaxBPS = {};
+            const interactionData = interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])][0];
+
+            for (const point of interactionData) {
+                const time = point[0];
+                const intervalIndex = Math.floor((time - fullGraphInfo.CaptureStartTimestamp) / interval);
+
+                if (intervalIndex in intervalIndexToMaxBPS) {
+                    intervalIndexToMaxBPS[intervalIndex] = Math.max(point[1], intervalIndexToMaxBPS[intervalIndex]);
+                } else {
+                    intervalIndexToMaxBPS[intervalIndex] = point[1]; 
+                }
+            }
+
+            for (const [intervalIndex, maxBPS] of Object.entries(intervalIndexToMaxBPS)) {
+                if ((1 + parseInt(intervalIndex)) in intervalIndexToMaxBPS) {
+                    if ((1 + increase) * maxBPS < intervalIndexToMaxBPS[(1 + parseInt(intervalIndex))]) {
+                        trafficIncreasements.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
+                    }
+                }
+            }
+        }
+
         const newElements = fullGraphInfo.Elements;
         for (const element of newElements) {
             // Check if is edge
             if (element.data.source !== undefined) {
-                if (newNewConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
-                    element.classes = "edgenewconnection";
+                if (trafficIncreasements.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
+                    element.classes = "edgetrafficincrease";
                 }
                 else {
                     element.classes = "edge";
@@ -328,12 +371,12 @@ function Home() {
             }
         }
 
-        console.log(`full count: ${interactions.current.length}, ${newNewConnections.size}`)
-        setFullGraphInfo({ IsInitial: false, Elements: newElements, NewConnectionsAfterBaseLine: newNewConnections, CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp, CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp });
-    }
-
-    function onClickFindTrafficIncrease(interval, increase) {
-
+        setFullGraphInfo({
+            IsInitial: false,
+            Elements: newElements,
+            CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp,
+            CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp,
+        });
     }
 
     return (

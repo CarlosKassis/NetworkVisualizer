@@ -4,43 +4,39 @@ import { parsePercentage } from '../Utils'
 function PercentInput(props) {
 
     const [errorMessage, setErrorMessage] = useState('');
-    const [time, setTime] = useState(0);
+    const [percentage, setPercentage] = useState(0);
 
 
     function handleInputChange(event) {
         const inputString = event.target.value;
         if (inputString == null || inputString == '') {
-            onInvalidTime('');
+            onInputChangeInvalid('');
             return;
         }
 
         const percentage = parsePercentage(inputString);
         if (!isNaN(percentage)) {
-            if (percentage <= 0.0001 || percentage > 100.0) {
-                onInvalidTime('Valid percentage: 0% < P <= 100%');
-                return;
-            }
-
-            onValidTime(props.captureLength * percentage / 100.0)
+            onInputChangeValid(percentage / 100.0)
             return;
         }
 
-        onInvalidTime('Valid Input: X%');
+        onInputChangeInvalid('Valid Input: X%');
     }
 
-    function onValidTime(time) {
+    function onInputChangeValid(time) {
         setErrorMessage('');
-        setTime(time);
-        if (props.setTime != null) {
-            props.setTime(time);
+        setPercentage(time);
+        console.log(time);
+        if (props.onInputChange != null) {
+            props.onInputChange(time);
         }
     }
 
-    function onInvalidTime(errorMessage) {
+    function onInputChangeInvalid(errorMessage) {
         setErrorMessage(errorMessage);
-        setTime(null);
-        if (props.setTime != null) {
-            props.setTime(null);
+        setPercentage(null);
+        if (props.onInputChange != null) {
+            props.onInputChange(null);
         }
     }
 

@@ -9,48 +9,48 @@ function PercentOrTimeInput(props) {
     function handleInputChange(event) {
         const inputString = event.target.value;
         if (inputString == null || inputString == '') {
-            onInvalidTime('');
+            onInputChangeInvalid('');
             return;
         }
 
         const percentage = parsePercentage(inputString);
         if (!isNaN(percentage)) {
             if (percentage <= 0.0001 || percentage > 100.0) {
-                onInvalidTime('Valid percentage: 0% < P <= 100%');
+                onInputChangeInvalid('Valid percentage: 0% < P <= 100%');
                 return;
             }
 
-            onValidTime(props.captureLength * percentage / 100.0)
+            onInputChangeValid(props.captureLength * percentage / 100.0)
             return;
         }
 
         const time = parseTime(inputString);
         if (!isNaN(time)) {
             if (time <= 0.0001) {
-                onInvalidTime('Time must be positive');
+                onInputChangeInvalid('Time must be positive');
                 return;
             }
 
-            onValidTime(time);
+            onInputChangeValid(time);
             return;
         }
 
-        onInvalidTime('Valid Input: 60% / 50s / 30m / 2.4h / 7.3d ...');
+        onInputChangeInvalid('Valid Input: 60% / 50s / 30m / 2.4h / 7.3d ...');
     }
 
-    function onValidTime(time) {
+    function onInputChangeValid(time) {
         setErrorMessage('');
         setTime(time);
-        if (props.setTime != null) {
-            props.setTime(time);
+        if (props.onInputChange != null) {
+            props.onInputChange(time);
         }
     }
 
-    function onInvalidTime(errorMessage) {
+    function onInputChangeInvalid(errorMessage) {
         setErrorMessage(errorMessage);
         setTime(null);
-        if (props.setTime != null) {
-            props.setTime(null);
+        if (props.onInputChange != null) {
+            props.onInputChange(null);
         }
     }
 

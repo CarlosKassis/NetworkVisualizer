@@ -17,7 +17,7 @@ function NewConnections(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
             <h4><b>New Connections</b></h4>
-            <PercentOrTimeInput captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onValidInput={(time) => baseline.current = time}></PercentOrTimeInput>
+            <PercentOrTimeInput captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onInputChange={(time) => baseline.current = time}></PercentOrTimeInput>
             <button className={"btn-cyber"} onClick={onClickFind}><b>Find</b></button>
         </div>
     );
