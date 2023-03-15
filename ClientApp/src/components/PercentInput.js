@@ -1,56 +1,56 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { getStoredFilter, isValidFilter } from '../Utils'
+import React, { useState } from 'react';
+import { parsePercentage } from '../Utils'
 
 function PercentInput(props) {
 
-    const [validInput, setValidInput] = useState(true);
-    const [initilized, setInitialized] = useState(false);
-    const filterInput = useRef();
+    const [errorMessage, setErrorMessage] = useState('');
+    const [time, setTime] = useState(0);
 
 
-    // Initialization
-    useEffect(() => {
-        if (initilized) {
+    function handleInputChange(event) {
+        const inputString = event.target.value;
+        if (inputString == null || inputString == '') {
+            onInvalidTime('');
             return;
         }
 
-        setInitialized(true);
-
-        const storedFilter = getStoredFilter(props.filterType);
-        if (storedFilter !== null) {
-            if (isValidFilter(storedFilter)) {
-                filterInput.current.value = storedFilter;
-                props.onChangeValidInput(storedFilter);
-                setValidInput(true);
+        const percentage = parsePercentage(inputString);
+        if (!isNaN(percentage)) {
+            if (percentage <= 0.0001 || percentage > 100.0) {
+                onInvalidTime('Valid percentage: 0% < P <= 100%');
                 return;
             }
 
-            setValidInput(false);
+            onValidTime(props.captureLength * percentage / 100.0)
             return;
         }
 
-        setValidInput(true);
-    }, [initilized]);
+        onInvalidTime('Valid Input: X%');
+    }
 
-    function handleInputChange(event) {
-
-        const filterString = event.target.value;
-        if (isValidFilter(filterString)) {
-            props.onChangeValidInput(filterString);
-            setValidInput(true);
-            return;
+    function onValidTime(time) {
+        setErrorMessage('');
+        setTime(time);
+        if (props.setTime != null) {
+            props.setTime(time);
         }
+    }
 
-        setValidInput(false);
+    function onInvalidTime(errorMessage) {
+        setErrorMessage(errorMessage);
+        setTime(null);
+        if (props.setTime != null) {
+            props.setTime(null);
+        }
     }
 
     return (
         <div>
             <h5>{`${props.title}:`}</h5>
             <div className={"flex-cyber"}>
-                <input ref={filterInput} onChange={handleInputChange} style={{ width: '100px' }} />
+                <input onChange={handleInputChange} style={{ width: '100px' }} />
             </div>
-            {validInput ? <br /> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>Valid Input: X%</b></p>}
+            {errorMessage == '' ? <br /> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>{errorMessage}</b></p>}
         </div>
     );
 }

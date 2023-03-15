@@ -13,7 +13,9 @@ import TrafficIncrease from './TrafficIncrease';
 
 function Home() {
 
-    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [], NewConnections: new Set() });
+    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [], NewConnectionsAfterBaseLine: new Set() });
+    const [graphInfo, setGraphInfo] = useState({ Elements: [] });
+
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
     const interactions = useRef([]);
@@ -46,6 +48,8 @@ function Home() {
 
     useEffect(() => {
         const graphElements = getFilteredGraphElements();
+        console.log(graphElements);
+
         cyRef.current.json({ elements: (graphElements !== [] ? graphElements : defaultElements) });
         if (fullGraphInfo.IsInitial) {
             cyRef.current.center();
@@ -241,12 +245,7 @@ function Home() {
         }
 
         for (const interaction of networkInfo.Interactions) {
-            if (newConnectionsAfterBaseline.has(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))) {
-                elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge-new-connection' });
-            }
-            else {
-                elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge' });
-            }
+            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edgenewconnection' });
         }
 
         setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
@@ -287,7 +286,7 @@ function Home() {
     }
 
     function resetFullGraphInfo() {
-        setFullGraphInfo({ IsInitial: true, Elements: [] });
+        setFullGraphInfo({ IsInitial: true, Elements: [], NewConnectionsAfterBaseLine: new Set() });
     }
 
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
@@ -309,15 +308,32 @@ function Home() {
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
         const newNewConnections = new Set();
-
         for (const interaction of interactions.current) {
             // interaction[2] = interaction first packet timestamp
+            console.log(`${interaction[2]}, ${fullGraphInfo.CaptureStartTimestamp} ${baseline}`);
             if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + baseline) {
                 newNewConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
             }
         }
+        const newElements = fullGraphInfo.Elements;
+        for (const element of newElements) {
+            // Check if is edge
+            if (element.data.source !== undefined) {
+                if (newNewConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
+                    element.classes = "edgenewconnection";
+                }
+                else {
+                    element.classes = "edge";
+                }
+            }
+        }
 
-        setFullGraphInfo({ IsInitial: fullGraphInfo.IsInitial, Elements: fullGraphInfo.Elements, NewConnections: newNewConnections });
+        console.log(`full count: ${interactions.current.length}, ${newNewConnections.size}`)
+        setFullGraphInfo({ IsInitial: false, Elements: newElements, NewConnectionsAfterBaseLine: newNewConnections, CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp, CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp });
+    }
+
+    function onClickFindTrafficIncrease(interval, increase) {
+
     }
 
     return (
@@ -337,7 +353,7 @@ function Home() {
                     <EntityInfo entityInfo={entityInfo} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
                     <NewConnections onSubmit={onClickFindNewConnections} captureLength={captureLength} onFilterGraph={onFilterGraph} />
-                    <TrafficIncrease captureLength={captureLength} onFilterGraph={onFilterGraph} />
+                    <TrafficIncrease onSubmit={onClickFindTrafficIncrease} captureLength={captureLength} onFilterGraph={onFilterGraph} />
                 </div>
 
                 <div className={"flex-cyber"} style={{ height: 'fit-content' }}>

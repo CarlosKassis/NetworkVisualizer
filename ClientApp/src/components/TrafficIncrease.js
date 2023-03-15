@@ -1,55 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import PercentOrTimeInput from './PercentOrTimeInput';
 import './Cyber.css'
-import { isValidFilter, getStoredFilter } from '../Utils'
 import Cookies from 'universal-cookie';
 import PercentInput from './PercentInput';
 
 function TrafficIncrease(props) {
 
-    const [inclusionString, setInclusionString] = useState('');
-    const [exclusionString, setExclusionString] = useState('');
+    const interval = useRef(null);
+    const increase = useRef(null);
 
-    // Run once on load
-    useEffect(() => {
-        const storedInclusions = getStoredFilter("Inclusions")
-        const storedExclusions = getStoredFilter("Exclusions")
-
-        if (storedInclusions !== null) {
-            setInclusionString(storedInclusions);
-        }
-
-        if (storedExclusions !== null) {
-            setExclusionString(storedExclusions);
-        }
-
-        onFilter(storedInclusions, storedExclusions, false);
-    }, []);
-
-    function onClickFilter() {
-        onFilter(inclusionString, exclusionString);
-    }
-
-    function onFilter(inclusionStringParam, exclusionStringParam, storeCookies = true) {
-        if (!isValidFilter(inclusionStringParam) || !isValidFilter(exclusionStringParam)) {
+    function onClickFind() {
+        if (interval.current == null) {
             return;
         }
 
-        if (storeCookies) {
-            const cookies = new Cookies();
-            cookies.set(`filter-Inclusions`, inclusionStringParam, { path: '/' });
-            cookies.set(`filter-Exclusions`, exclusionStringParam, { path: '/' });
-        }
-
-        props.onFilterGraph(inclusionStringParam, exclusionStringParam)
+        props.onSubmit(interval.current, increase.current);
     }
 
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
             <h4><b>Traffic Increase</b></h4>
-            <PercentOrTimeInput captureLength={props.captureLength} title={"Interval [%,s,m,h,d]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentOrTimeInput>
-            <PercentInput title={"Change [%]"} onChangeValidInput={(str) => setInclusionString(str)}></PercentInput>
-            <button className={"btn-cyber"} onClick={onClickFilter}><b>Find</b></button>
+            <PercentOrTimeInput captureLength={props.captureLength} title={"Interval [%,s,m,h,d]"} onValidInput={(time) => interval.current = time}></PercentOrTimeInput>
+            <PercentInput title={"Change [%]"} onValidInput={(ratio) => increase.current = ratio}></PercentInput>
+            <button className={"btn-cyber"} onClick={onClickFind}><b>Find</b></button>
         </div>
     );
 }
