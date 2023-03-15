@@ -4,7 +4,7 @@ import { parsePercentage, parseTime } from '../Utils'
 function PercentOrTimeInput(props) {
 
     const [errorMessage, setErrorMessage] = useState('');
-    const [time, setTime] = useState(0);
+    const [time, setTime] = useState(null);
 
     function handleInputChange(event) {
         const inputString = event.target.value;

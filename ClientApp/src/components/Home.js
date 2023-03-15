@@ -14,7 +14,7 @@ import TrafficIncrease from './TrafficIncrease';
 function Home() {
 
     const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
-    const [graphInfo, setGraphInfo] = useState({ Elements: [] });
+    const [newConnections, setNewConnections] = useState(new Set());
 
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
@@ -31,7 +31,7 @@ function Home() {
     const interactionKeyToData = useRef({});
     const cyRef = useRef(null);
 
-    const EntityType = 
+    const EntityType =
     {
         'Gateway': 0,
         'DHCP': 1,
@@ -47,14 +47,31 @@ function Home() {
     const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
 
     useEffect(() => {
-        const graphElements = getFilteredGraphElements();
+        const filteredElements = getFilteredGraphElements();
+        var filteredNewConnectionsElements = [];
 
-        cyRef.current.json({ elements: (graphElements !== [] ? graphElements : defaultElements) });
+        if (newConnections !== null && newConnections.size > 0) {
+            for (const element of filteredElements) {
+                // Check if is edge
+                if (element.data.source !== undefined) {
+                    if (newConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
+                        element.classes = "edgenewconnection";
+                        filteredNewConnectionsElements.push(element);
+                    }
+                } else {
+                    filteredNewConnectionsElements.push(element);
+                }
+            }
+        } else {
+            filteredNewConnectionsElements = filteredElements;
+        }
+
+        cyRef.current.json({ elements: filteredNewConnectionsElements });
         if (fullGraphInfo.IsInitial) {
             cyRef.current.center();
         }
 
-    }, [fullGraphInfo]);
+    }, [fullGraphInfo, newConnections]);
 
     useEffect(() => {
         const graphElements = getFilteredGraphElements();
@@ -117,7 +134,7 @@ function Home() {
     }
 
     function shouldIpBeDisplayedOnGraph(ip) {
-        
+
         if (subnetFilter.exclusion.length > 0) {
             const ipInteger = ipToInteger(ip);
             if (subnetFilter.exclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
@@ -142,8 +159,7 @@ function Home() {
         setEntityInfoPanelData();
     }
 
-    function onReceiveNetworkInfoJson(json)
-    {
+    function onReceiveNetworkInfoJson(json) {
         const networkInfo = JSON.parse(json);
 
         if (!networkInfo) {
@@ -169,8 +185,7 @@ function Home() {
         updateBandwidthGraph();
     }
 
-    const writeEntityDataToEntityInfo = (nodeId) =>
-    {
+    const writeEntityDataToEntityInfo = (nodeId) => {
         if (!entityToData || entityToData[nodeId] === undefined) {
             return;
         }
@@ -188,8 +203,7 @@ function Home() {
 
         let elements = []
 
-        for (const entity of networkInfo.Entities)
-        {
+        for (const entity of networkInfo.Entities) {
             if (entity[0] === null || entity[1] === null) {
                 continue;
             }
@@ -212,28 +226,22 @@ function Home() {
             // Figure icon
             let icon = null;
             // TODO: use enums
-            if (entityData.Type === null || entityData.Type === EntityType.Computer)
-            {
+            if (entityData.Type === null || entityData.Type === EntityType.Computer) {
                 icon = '/computer.png';
             }
-            else if (entityData.Type === EntityType.Gateway)
-            {
+            else if (entityData.Type === EntityType.Gateway) {
                 icon = '/gateway.png';
             }
-            else if (entityData.Type === EntityType.DHCP)
-            {
+            else if (entityData.Type === EntityType.DHCP) {
                 icon = '/dhcp.png';
             }
-            else if (entityData.Type === EntityType.DNS)
-            {
+            else if (entityData.Type === EntityType.DNS) {
                 icon = '/dns.png';
             }
-            else if (entityData.Type === EntityType.Server)
-            {
+            else if (entityData.Type === EntityType.Server) {
                 icon = '/server.png';
             }
-            else 
-            {
+            else {
                 icon = '/iot.png';
             }
 
@@ -291,7 +299,7 @@ function Home() {
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
         if (liveCaptureIdResponse !== null) {
             liveCapture.current = { Id: liveCaptureIdResponse, Running: true };
-            setSelectedInteraction({Valid: false, Entity1: '', Entity2: ''})
+            setSelectedInteraction({ Valid: false, Entity1: '', Entity2: '' })
             resetFullGraphInfo();
         }
         else {
@@ -306,6 +314,12 @@ function Home() {
 
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
+        console.log(baseline);
+        if (baseline == null) {
+            setNewConnections(null);
+            return;
+        }
+
         const newConnections = new Set();
         for (const interaction of interactions.current) {
             // interaction[2] = interaction first packet timestamp
@@ -314,20 +328,7 @@ function Home() {
             }
         }
 
-        const newElements = fullGraphInfo.Elements;
-        for (const element of fullGraphInfo.Elements) {
-            // Check if is edge
-            if (element.data.source !== undefined) {
-                if (newConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
-                    element.classes = "edgenewconnection";
-                }
-                else {
-                    element.classes = "edge";
-                }
-            } }
-        }
-
-        setFullGraphInfo({ IsInitial: false, Elements: newElements, CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp, CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp });
+        setNewConnections(newConnections);
     }
 
     function onClickFindTrafficIncrease(interval, increase) {
@@ -345,7 +346,7 @@ function Home() {
                 if (intervalIndex in intervalIndexToMaxBPS) {
                     intervalIndexToMaxBPS[intervalIndex] = Math.max(point[1], intervalIndexToMaxBPS[intervalIndex]);
                 } else {
-                    intervalIndexToMaxBPS[intervalIndex] = point[1]; 
+                    intervalIndexToMaxBPS[intervalIndex] = point[1];
                 }
             }
 
@@ -370,13 +371,6 @@ function Home() {
                 }
             }
         }
-
-        setFullGraphInfo({
-            IsInitial: false,
-            Elements: newElements,
-            CaptureStartTimestamp: fullGraphInfo.CaptureStartTimestamp,
-            CaptureEndTimestamp: fullGraphInfo.CaptureEndTimestamp,
-        });
     }
 
     return (

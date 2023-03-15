@@ -7,10 +7,6 @@ function NewConnections(props) {
     const baseline = useRef(null);
 
     function onClickFind() {
-        if (baseline.current == null) {
-            return;
-        }
-
         props.onSubmit(baseline.current);
     }
 
