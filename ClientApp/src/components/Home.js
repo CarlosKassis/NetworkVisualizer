@@ -14,7 +14,7 @@ import TrafficIncrease from './TrafficIncrease';
 function Home() {
 
     const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
-    const [newConnections, setNewConnections] = useState(new Set());
+    const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(new Set());
 
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
@@ -48,9 +48,11 @@ function Home() {
 
     useEffect(() => {
         const filteredElements = getFilteredGraphElements();
+
         var filteredNewConnectionsElements = [];
 
-        if (newConnections !== null && newConnections.size > 0) {
+        const newConnections = getNewConnections();
+        if (newConnections !== null) {
             for (const element of filteredElements) {
                 // Check if is edge
                 if (element.data.source !== undefined) {
@@ -63,7 +65,15 @@ function Home() {
                 }
             }
         } else {
-            filteredNewConnectionsElements = filteredElements;
+            for (const element of filteredElements) {
+                // Check if is edge
+                if (element.data.source !== undefined) {
+                    element.classes = "edge";
+                    filteredNewConnectionsElements.push(element);
+                } else {
+                    filteredNewConnectionsElements.push(element);
+                }
+            }
         }
 
         cyRef.current.json({ elements: filteredNewConnectionsElements });
@@ -71,7 +81,7 @@ function Home() {
             cyRef.current.center();
         }
 
-    }, [fullGraphInfo, newConnections]);
+    }, [fullGraphInfo, newConnectionsBaseline]);
 
     useEffect(() => {
         const graphElements = getFilteredGraphElements();
@@ -175,6 +185,7 @@ function Home() {
         setEntityToData(entityDictionary);
 
         const newFullGraphElements = generateGraphElements(networkInfo);
+        interactions.current = networkInfo.Interactions;
 
         setFullGraphInfo({ IsInitial: fullGraphInfo.Elements.length == 0, Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
         interactionKeyToData.current = {};
@@ -257,8 +268,6 @@ function Home() {
 
         setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
 
-        interactions.current = networkInfo.Interactions;
-
         return elements;
     }
 
@@ -314,21 +323,25 @@ function Home() {
 
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
-        console.log(baseline);
-        if (baseline == null) {
-            setNewConnections(null);
-            return;
+
+        console.log('aaaaaa' + baseline)
+        setNewConnectionsBaseline(baseline);
+    }
+
+    function getNewConnections() {
+        if (newConnectionsBaseline === null) {
+            return null;
         }
 
         const newConnections = new Set();
         for (const interaction of interactions.current) {
             // interaction[2] = interaction first packet timestamp
-            if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + baseline) {
+            if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + newConnectionsBaseline) {
                 newConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
             }
         }
 
-        setNewConnections(newConnections);
+        return newConnections;
     }
 
     function onClickFindTrafficIncrease(interval, increase) {
