@@ -46,6 +46,10 @@ function Home() {
         updateBandwidthGraph();
     }, [selectedInteraction])
 
+
+    ////////////////////////////////////////////////
+    /// Main pipeline for showing graph elements ///
+    ////////////////////////////////////////////////
     useEffect(() => {
         const filteredElements = getFilteredGraphElements();
 
@@ -69,18 +73,11 @@ function Home() {
             cyRef.current.center();
         }
 
-    }, [fullGraphInfo, newConnectionsBaseline]);
-
-    useEffect(() => {
-        const graphElements = getFilteredGraphElements();
-        cyRef.current.json({ elements: graphElements });
-    }, [subnetFilter]);
+    }, [fullGraphInfo, newConnectionsBaseline, subnetFilter]);
 
     useEffect(() => {
         getNicsApi((nicsJson) => setNics(JSON.parse(nicsJson)));
-    }, []);
 
-    useEffect(() => {
         const intervalId = setInterval(() => {
             if (liveCapture.current.Running) {
                 getLiveCaptureDataApi(liveCapture.current.Id, onReceiveNetworkInfoJson);
