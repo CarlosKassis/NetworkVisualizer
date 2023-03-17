@@ -14,7 +14,7 @@ import TrafficIncrease from './TrafficIncrease';
 function Home() {
 
     const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
-    const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(new Set());
+    const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(null);
 
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
@@ -85,7 +85,7 @@ function Home() {
 
     useEffect(() => {
         const graphElements = getFilteredGraphElements();
-        cyRef.current.json({ elements: (graphElements.length !== [] ? graphElements : defaultElements) });
+        cyRef.current.json({ elements: graphElements });
     }, [subnetFilter]);
 
     useEffect(() => {
@@ -323,8 +323,6 @@ function Home() {
 
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
-
-        console.log('aaaaaa' + baseline)
         setNewConnectionsBaseline(baseline);
     }
 
