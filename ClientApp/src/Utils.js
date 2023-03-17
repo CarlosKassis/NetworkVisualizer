@@ -94,6 +94,11 @@ export function parsePercentage(str) {
     return getNumberWithoutFinalCharAndWhitespace(str, '%');
 }
 
+// Generate string key from entity pair
+export function entityPairToDictionaryKey(entity1, entity2) {
+    return `${entity1}-${entity2}`;
+}
+
 // Convert string to seconds
 export function parseTime(str) {
 

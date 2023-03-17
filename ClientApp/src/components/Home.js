@@ -4,17 +4,19 @@ import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
 import './Cyber.css'
-import { ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
+import { entityPairToDictionaryKey, ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
 import BandwidthChart from './BandwidthChart';
 import NewConnections from './NewConnections';
 import TrafficIncrease from './TrafficIncrease';
+import { addAnomalousNewConnectionsEdges, isEdge } from '../AnomalyUtils';
 
 function Home() {
 
     const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
     const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(null);
+    const [trafficIncreaseBaseline, setTrafficIncreaseBaseline] = useState(null);
 
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
@@ -44,39 +46,25 @@ function Home() {
         updateBandwidthGraph();
     }, [selectedInteraction])
 
-    const defaultElements = { 'data': { 'id': '0.0.0.0', 'label': 'PC', 'image': '/computer.png' } };
-
     useEffect(() => {
         const filteredElements = getFilteredGraphElements();
 
-        var filteredNewConnectionsElements = [];
-
-        const newConnections = getNewConnections();
-        if (newConnections !== null) {
-            for (const element of filteredElements) {
-                // Check if is edge
-                if (element.data.source !== undefined) {
-                    if (newConnections.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
-                        element.classes = "edgenewconnection";
-                        filteredNewConnectionsElements.push(element);
-                    }
-                } else {
-                    filteredNewConnectionsElements.push(element);
-                }
-            }
-        } else {
-            for (const element of filteredElements) {
-                // Check if is edge
-                if (element.data.source !== undefined) {
-                    element.classes = "edge";
-                    filteredNewConnectionsElements.push(element);
-                } else {
-                    filteredNewConnectionsElements.push(element);
-                }
+        // Reset edge class
+        for (const element of filteredElements) {
+            if (isEdge(element)) {
+                element.classes = "edge";
             }
         }
 
-        cyRef.current.json({ elements: filteredNewConnectionsElements });
+        // Decide if to display gathered anomalous edges or all edges
+        const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
+        if (newConnectionsBaseline !== null || trafficIncreaseBaseline !== null) {
+            addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp);
+            cyRef.current.json({ elements: filteredAnomalousElements });
+        } else {
+            cyRef.current.json({ elements: filteredElements });
+        }
+
         if (fullGraphInfo.IsInitial) {
             cyRef.current.center();
         }
@@ -276,10 +264,6 @@ function Home() {
         setSelectedInteraction({ Valid: true, Entity1: entity1, Entity2: entity2 })
     }
 
-    function entityPairToDictionaryKey(entity1, entity2) {
-        return `${entity1}-${entity2}`;
-    }
-
     function updateBandwidthGraph() {
 
         if (!selectedInteraction.Valid) {
@@ -324,22 +308,6 @@ function Home() {
     // baseline: integer of seconds 
     function onClickFindNewConnections(baseline) {
         setNewConnectionsBaseline(baseline);
-    }
-
-    function getNewConnections() {
-        if (newConnectionsBaseline === null) {
-            return null;
-        }
-
-        const newConnections = new Set();
-        for (const interaction of interactions.current) {
-            // interaction[2] = interaction first packet timestamp
-            if (interaction[2] >= fullGraphInfo.CaptureStartTimestamp + newConnectionsBaseline) {
-                newConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
-            }
-        }
-
-        return newConnections;
     }
 
     function onClickFindTrafficIncrease(interval, increase) {
