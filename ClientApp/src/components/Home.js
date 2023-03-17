@@ -252,7 +252,7 @@ function Home() {
         }
 
         for (const interaction of networkInfo.Interactions) {
-            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edgenewconnection' });
+            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge' });
         }
 
         setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
