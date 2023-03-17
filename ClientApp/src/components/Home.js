@@ -303,11 +303,11 @@ function Home() {
     }
 
     // baseline: integer of seconds 
-    function onClickFindNewConnections(baseline) {
+    function onNewConnectionsNewBaseline(baseline) {
         setNewConnectionsBaseline(baseline);
     }
 
-    function onClickFindTrafficIncrease(interval, increase) {
+    function onTrafficIncreaseNewParams(interval, increase) {
         const trafficIncreasements = new Set();
 
         for (const interaction of interactions.current) {
@@ -365,8 +365,8 @@ function Home() {
                 }}>
                     <EntityInfo entityInfo={entityInfo} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
-                    <NewConnections onSubmit={onClickFindNewConnections} captureLength={captureLength} onFilterGraph={onFilterGraph} />
-                    <TrafficIncrease onSubmit={onClickFindTrafficIncrease} captureLength={captureLength} onFilterGraph={onFilterGraph} />
+                    <NewConnections onParamsChange={onNewConnectionsNewBaseline} captureLength={captureLength} onFilterGraph={onFilterGraph} />
+                    <TrafficIncrease onParamsChange={onTrafficIncreaseNewParams} captureLength={captureLength} onFilterGraph={onFilterGraph} />
                 </div>
 
                 <div className={"flex-cyber"} style={{ height: 'fit-content' }}>

@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { parsePercentage, parseTime } from '../Utils'
 
 function PercentOrTimeInput(props) {
 
     const [errorMessage, setErrorMessage] = useState('');
-    const [time, setTime] = useState(null);
+    const [input, setInput] = useState(null);
+    const [displayTime, setDisplayTime] = useState('');
 
-    function handleInputChange(event) {
-        const inputString = event.target.value;
-        if (inputString == null || inputString == '') {
+    useEffect(() => {
+        if (input == null || input == '') {
             onInputChangeInvalid('');
             return;
         }
 
-        const percentage = parsePercentage(inputString);
+        const percentage = parsePercentage(input);
         if (!isNaN(percentage)) {
             if (percentage <= 0.0001 || percentage > 100.0) {
                 onInputChangeInvalid('Valid percentage: 0% < P <= 100%');
@@ -24,7 +24,7 @@ function PercentOrTimeInput(props) {
             return;
         }
 
-        const time = parseTime(inputString);
+        const time = parseTime(input);
         if (!isNaN(time)) {
             if (time <= 0.0001) {
                 onInputChangeInvalid('Time must be positive');
@@ -36,22 +36,22 @@ function PercentOrTimeInput(props) {
         }
 
         onInputChangeInvalid('Valid Input: 60% / 50s / 30m / 2.4h / 7.3d ...');
+    }, [input, props.captureLength])
+
+    function handleInputChange(event) {
+        setInput(event.target.value);
     }
 
     function onInputChangeValid(time) {
         setErrorMessage('');
-        setTime(time);
-        if (props.onInputChange != null) {
-            props.onInputChange(time);
-        }
+        props.onTimeChange(time);
+        setDisplayTime(time);
     }
 
     function onInputChangeInvalid(errorMessage) {
         setErrorMessage(errorMessage);
-        setTime(null);
-        if (props.onInputChange != null) {
-            props.onInputChange(null);
-        }
+        props.onTimeChange(null);
+        setDisplayTime('');
     }
 
     function secondsToTimeString(seconds) {
@@ -87,7 +87,9 @@ function PercentOrTimeInput(props) {
             <h5 style={{ marginTop: '10px' }}>{`${props.title}:`}</h5>
             <div className={"flex-cyber"}>
                 <input onChange={handleInputChange} style={{ width: '100px', marginTop: '5px' }} />
-                <h6 style={{ marginTop: '7px', marginLeft: '10px' }}><b>{`${secondsToTimeString(time)}/${secondsToTimeString(props.captureLength)}`}</b></h6>
+                <h6 style={{ marginTop: '7px', marginLeft: '10px' }}>
+                    <b>{`${secondsToTimeString(displayTime)}/${secondsToTimeString(props.captureLength)}`}</b>
+                </h6>
             </div>
             {errorMessage == '' ? <br/> : <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>{errorMessage}</b></p>}
         </div>
