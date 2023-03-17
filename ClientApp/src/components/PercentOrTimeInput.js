@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { parsePercentage, parseTime } from '../Utils'
 
+// Component that takes percentage (needs props.captureLength) or time input from field and returns time in seconds ('50%'*1m/'30s' => 30)
 function PercentOrTimeInput(props) {
 
     const [errorMessage, setErrorMessage] = useState('');
     const [input, setInput] = useState(null);
-    const [displayTime, setDisplayTime] = useState('');
+    const [displayTime, setDisplayTime] = useState(null);
 
     useEffect(() => {
         if (input == null || input == '') {
@@ -51,12 +52,12 @@ function PercentOrTimeInput(props) {
     function onInputChangeInvalid(errorMessage) {
         setErrorMessage(errorMessage);
         props.onTimeChange(null);
-        setDisplayTime('');
+        setDisplayTime(null);
     }
 
     function secondsToTimeString(seconds) {
-        if (seconds == null) {
-            return '0s';
+        if (seconds === null) {
+            return '?';
         }
 
         if (seconds < 60) {

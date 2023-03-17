@@ -10,13 +10,15 @@ import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureData
 import BandwidthChart from './BandwidthChart';
 import NewConnections from './NewConnections';
 import TrafficIncrease from './TrafficIncrease';
-import { addAnomalousNewConnectionsEdges, isEdge } from '../AnomalyUtils';
+import { addAnomalousNewConnectionsEdges, addAnomalousTrafficIncreaseEdges, isEdge } from '../AnomalyUtils';
 
 function Home() {
 
     const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
+
+    // Anomaly
     const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(null);
-    const [trafficIncreaseBaseline, setTrafficIncreaseBaseline] = useState(null);
+    const [trafficIncreaseParams, setTrafficIncreaseParams] = useState(null);
 
     const [entityToData, setEntityToData] = useState(null)
     const liveCapture = useRef({ Id: null, Running: false });
@@ -31,6 +33,8 @@ function Home() {
     const [chartData, setChartData] = useState([1]);
     const [selectedInteraction, setSelectedInteraction] = useState({ Valid: false, Entity1: '', Entity2: '' });
     const interactionKeyToData = useRef({});
+
+    // Graph
     const cyRef = useRef(null);
 
     const EntityType =
@@ -62,8 +66,15 @@ function Home() {
 
         // Decide if to display gathered anomalous edges or all edges
         const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
-        if (newConnectionsBaseline !== null || trafficIncreaseBaseline !== null) {
-            addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp);
+        if (newConnectionsBaseline !== null || trafficIncreaseParams !== null) {
+            if (newConnectionsBaseline !== null) {
+                addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp);
+            }
+
+            if (trafficIncreaseParams !== null) {
+                addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase, fullGraphInfo.CaptureStartTimestamp);
+            }
+
             cyRef.current.json({ elements: filteredAnomalousElements });
         } else {
             cyRef.current.json({ elements: filteredElements });
@@ -73,7 +84,7 @@ function Home() {
             cyRef.current.center();
         }
 
-    }, [fullGraphInfo, newConnectionsBaseline, subnetFilter]);
+    }, [fullGraphInfo, newConnectionsBaseline, subnetFilter, trafficIncreaseParams]);
 
     useEffect(() => {
         getNicsApi((nicsJson) => setNics(JSON.parse(nicsJson)));
@@ -307,46 +318,8 @@ function Home() {
         setNewConnectionsBaseline(baseline);
     }
 
-    function onTrafficIncreaseNewParams(interval, increase) {
-        const trafficIncreasements = new Set();
-
-        for (const interaction of interactions.current) {
-            // Index = floor((point.x - CaptureStartTime) / Interval)
-            const intervalIndexToMaxBPS = {};
-            const interactionData = interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])][0];
-
-            for (const point of interactionData) {
-                const time = point[0];
-                const intervalIndex = Math.floor((time - fullGraphInfo.CaptureStartTimestamp) / interval);
-
-                if (intervalIndex in intervalIndexToMaxBPS) {
-                    intervalIndexToMaxBPS[intervalIndex] = Math.max(point[1], intervalIndexToMaxBPS[intervalIndex]);
-                } else {
-                    intervalIndexToMaxBPS[intervalIndex] = point[1];
-                }
-            }
-
-            for (const [intervalIndex, maxBPS] of Object.entries(intervalIndexToMaxBPS)) {
-                if ((1 + parseInt(intervalIndex)) in intervalIndexToMaxBPS) {
-                    if ((1 + increase) * maxBPS < intervalIndexToMaxBPS[(1 + parseInt(intervalIndex))]) {
-                        trafficIncreasements.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
-                    }
-                }
-            }
-        }
-
-        const newElements = fullGraphInfo.Elements;
-        for (const element of newElements) {
-            // Check if is edge
-            if (element.data.source !== undefined) {
-                if (trafficIncreasements.has(entityPairToDictionaryKey(element.data.source, element.data.target))) {
-                    element.classes = "edgetrafficincrease";
-                }
-                else {
-                    element.classes = "edge";
-                }
-            }
-        }
+    function onTrafficIncreaseNewParams(baseline, increase) {
+        setTrafficIncreaseParams((baseline === null || increase === null) ? null : { Baseline: baseline, Increase: increase })
     }
 
     return (
