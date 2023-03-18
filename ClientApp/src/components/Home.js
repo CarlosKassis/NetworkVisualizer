@@ -85,7 +85,15 @@ function Home() {
 
     useEffect(() => {
 
-        // List for 'Cancel' key
+        cyRef.current.on('mousedown', function (evt) {
+            setSelectedInteraction(null);
+        });
+
+        cyRef.current.on('touchstart', function (evt) {
+            setSelectedInteraction(null);
+        });
+
+        // Listen for 'Cancel' key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 setSelectedInteraction(null);
@@ -203,7 +211,7 @@ function Home() {
         }
 
         var entityData = entityToData[nodeId];
-        setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain, entityData.Services.join(','));
+        setEntityInfoPanelData(entityData.Ip, entityData.Hostname, entityData.Mac, entityData.Os, entityData.Domain, entityData.Services.join(', '));
     }
 
     const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null, services = null) => {
@@ -321,8 +329,9 @@ function Home() {
 
                 <div style={{
                     wordWrap: 'break-word',
-                    maxWidth: '400px',
-                    height: '100%'
+                    width: '30vh',
+                    height: '100%',
+                    marginRight: '20px'
                 }}>
                     <EntityInfo entityInfo={entityInfo} />
                     <GraphFilter onFilterGraph={onFilterGraph} />
@@ -331,19 +340,16 @@ function Home() {
                 </div>
 
                 <div className={"flex-cyber"} style={{ height: 'fit-content' }}>
+                    <div className={"graph-floating"} style={{ height: 'fit-content' }}>
+                        <FileUploadSingle onCallback={onFileUpload} />
+                    </div>
 
-                    <div>
-                        <div className={"graph-floating"} style={{ height: 'fit-content' }}>
-                            <FileUploadSingle onCallback={onFileUpload} />
+                    <div className={"graph-floating"} style={{ height: 'fit-content' }}>
+                        <div style={{ marginBottom: '1vh' }} className={"flex-cyber"}>
+                            <button className={"btn-cyber"} onClick={() => startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse)}>Capture</button>
+                            <button className={"btn-cyber"} onClick={stopLiveCapture}>Stop</button>
                         </div>
-
-                        <div className={"graph-floating"} style={{ height: 'fit-content' }}>
-                            <div className={"flex-cyber"}>
-                                <button className={"btn-cyber"} onClick={() => startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse)}>Capture</button>
-                                <button className={"btn-cyber"} onClick={stopLiveCapture}>Stop</button>
-                            </div>
-                            <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
-                        </div>
+                        <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
                     </div>
                 </div>
             </div>

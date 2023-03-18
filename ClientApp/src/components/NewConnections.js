@@ -11,8 +11,8 @@ function NewConnections(props) {
     }, [props.captureLength, baseline]);
 
     return (
-        <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
-            <h4><b>New Connections</b></h4>
+        <div className={"user-control-part graph-floating"} style={{ width: '100%' }} >
+            <h3 className={"graph-control-title"}><b>New Connections</b></h3>
             <PercentOrTimeInput captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onTimeChange={(time) => setBaseline(time)}></PercentOrTimeInput>
         </div>
     );

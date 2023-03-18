@@ -35,7 +35,7 @@ function FileUploadSingle(props) {
     return (
         <div>
             <button className={"btn-cyber"} onClick={handleFileUpload}>Upload</button>
-            <input type="file" onChange={(e) => setUploadedfile(e.target.files[0])} multiple={false} />
+            <input style={{ marginTop: '0.75vh' }} type="file" onChange={(e) => setUploadedfile(e.target.files[0])} multiple={false} />
         </div>
     );
 }

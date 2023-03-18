@@ -44,12 +44,10 @@ function GraphFilter(props) {
     }
 
     return (
-        <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
-            <h4><b>Filter</b></h4>
+        <div className={"user-control-part graph-floating"} style={{ width: '100%' }} >
+            <h3 className={"graph-control-title"}><b>Filter</b></h3>
             <IpFilter filterType={"Inclusions"} onChangeValidInput={(str) => setInclusionString(str)}></IpFilter>
-            <br />
             <IpFilter filterType={"Exclusions"} onChangeValidInput={(str) => setExclusionString(str)}></IpFilter>
-            <br />
             <button className={"btn-cyber"} onClick={onClickFilter}><b>Filter</b></button>
         </div>
     );

@@ -4,7 +4,7 @@ import EntityInfoField from './EntityInfoField';
 function EntityInfo(props) {
 
     return (
-        <div className={"user-control-part graph-floating"} style={{ width: '300px' }} >
+        <div className={"user-control-part graph-floating"} style={{ width: '100%', height: '100%'}} >
             <EntityInfoField title={"IP address"} info={props.entityInfo.ip} />
             <EntityInfoField title={"Hostname"} info={props.entityInfo.hostname} />
             <EntityInfoField title={"MAC address"} info={props.entityInfo.mac} />

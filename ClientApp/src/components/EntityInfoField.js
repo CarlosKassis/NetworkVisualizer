@@ -6,7 +6,7 @@ function EntityInfoField(props) {
         <div >
             {
                 <div>
-                    <h5 style={{ paddingBottom: '15px' }}><b>{props.title}: </b>{props.info == null ? "" : props.info}</h5>
+                    <p style={{ marginBottom: '10px', fontSize: '1.6vh' }}><b>{props.title}: </b>{props.info == null ? "" : props.info}</p>
                 </div>
             }
         </div>

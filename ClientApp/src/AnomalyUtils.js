@@ -37,6 +37,10 @@ function getTrafficIncreaseElements(baseline, increase, captureStartTime, intera
     const trafficIncreasements = new Set();
     for (const interaction of interactions) {
         var maxBpsBaseline = 0, maxBpsAfterBaseline = 0;
+        if (interaction[1].length <= 1) {
+            return trafficIncreasements;
+        }
+
         for (const point of interaction[1]) {
             if (point[0] - captureStartTime < baseline) {
                 maxBpsBaseline = Math.max(maxBpsBaseline, point[1]);
@@ -45,12 +49,10 @@ function getTrafficIncreaseElements(baseline, increase, captureStartTime, intera
             }
         }
 
-        console.log('zzz: ' + maxBpsBaseline + ', ' + increase + ', ' + maxBpsAfterBaseline);
         if (maxBpsBaseline * (1 + increase) <= maxBpsAfterBaseline) {
             trafficIncreasements.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
         }
     }
 
-    console.log(trafficIncreasements);
     return trafficIncreasements;
 }

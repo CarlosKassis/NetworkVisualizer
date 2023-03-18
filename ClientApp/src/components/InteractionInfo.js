@@ -11,8 +11,6 @@ function InteractionInfo(props) {
     }, [props.interaction])
 
     useEffect(() => {
-        console.log(interaction);
-
         if (interaction === null) {
             setChartData([[0, 0]]);
             return;
