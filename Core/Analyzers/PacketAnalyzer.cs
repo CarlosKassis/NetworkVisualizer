@@ -18,6 +18,7 @@ namespace NetworkAnalyzer.Core.Analyzers
     using NetworkAnalyzer.Utils.Dhcp.Enums;
     using System.Net;
     using System.Text;
+    using System.Linq;
 
     // Extracting Os from certain sources has more priority than other sources
     // The lower, the more priority it has
@@ -204,20 +205,41 @@ namespace NetworkAnalyzer.Core.Analyzers
         public long FirstPacketTimestamp { get; private set; } = long.MaxValue;
         public long LastPacketTimestamp { get; private set; } = long.MinValue;
 
+        // Use Dictionary for atomic check and add
+        public readonly ConcurrentDictionary<int, bool> ServicePorts = new ConcurrentDictionary<int, bool>(); 
+
         public readonly ConcurrentDictionary<long, long> _bytesPerSecond = new ConcurrentDictionary<long, long>();
 
-        public void AggregateBytes(long timestamp, long bytes)
+        private void AggregateBytesHelper(long timestamp, (int Port1, int Port2)? ports = null)
         {
-            _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
             FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
             LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
+
+            if (ports != null)
+            {
+                int port1 = ports.Value.Port1, port2 = ports.Value.Port2;
+                if (port1 <= 1023)
+                {
+                    ServicePorts[port1] = true;
+                }
+
+                if (port2 <= 1023)
+                {
+                    ServicePorts[port2] = true;
+                }
+            }
         }
 
-        public ConcurrentInteractionData(long timestamp, long bytes)
+        public void AggregateBytes(long timestamp, long bytes, (int Port1, int Port2)? ports = null)
+        {
+            _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
+            AggregateBytesHelper(timestamp, ports);
+        }
+
+        public ConcurrentInteractionData(long timestamp, long bytes, (int Port1, int Port2)? ports = null)
         {
             _bytesPerSecond[timestamp] = bytes;
-            FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
-            LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
+            AggregateBytesHelper(timestamp, ports);
         }
     }
 
@@ -294,7 +316,6 @@ namespace NetworkAnalyzer.Core.Analyzers
             "DNS", "HTTP", "HTTPS"
         };
 
-        private readonly ConcurrentDictionary<string, string> _hosts = new ConcurrentDictionary<string, string>();
         private readonly ConcurrentDictionary<string, ConcurrentEntityData> _entities = new ConcurrentDictionary<string, ConcurrentEntityData>();
         private readonly ConcurrentDictionary<(string, string), ConcurrentInteractionData> _interactions = new ConcurrentDictionary<(string, string), ConcurrentInteractionData>();
         private readonly ConcurrentDictionary<string, ConcurrentSubnetData> _subnets = new ConcurrentDictionary<string, ConcurrentSubnetData>();
@@ -304,7 +325,7 @@ namespace NetworkAnalyzer.Core.Analyzers
         private PacketCommunicator? _packetCommunicator;
         private Task? _packetSniffTask;
 
-        // OnSniff - Good for workflows that involves constant polling for analysis
+        // OnSniff - Good for workflows that involve constant polling for analysis
         // Aggregate - Good for workflows that invlove polling for analysis once or very few often
         public enum PacketAnalysisTiming
         {
@@ -378,7 +399,7 @@ namespace NetworkAnalyzer.Core.Analyzers
                     {
                         double x = subnetCenter.X + subnetRadius * Math.Cos(radiansBetweenEntities * entityIndex) - viewBoxWidth / 2.0;
                         double y = subnetCenter.Y + subnetRadius * Math.Sin(radiansBetweenEntities * entityIndex) - viewBoxWidth / 2.0;
-                        var position = new double[] { x, y };
+                        var position = new double[] { x, y }; // TODO: round position to reduce JSON size
                         subnetEntityPositions[entity.Key] = position;
                         entityIndex++;
                     }
@@ -407,7 +428,8 @@ namespace NetworkAnalyzer.Core.Analyzers
                 { 
                     new string[] { interaction.Key.Item1, interaction.Key.Item2 },
                     interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value }),
-                    interaction.Value.FirstPacketTimestamp
+                    interaction.Value.FirstPacketTimestamp,
+                    interaction.Value.ServicePorts.Select(kvp => kvp.Key)
                 }),
 
                 EntityPositions = subnetEntityPositions,
@@ -928,16 +950,27 @@ namespace NetworkAnalyzer.Core.Analyzers
                 return;
             }
 
+            (int Port1, int Port2)? ports = null;
+            if (packet.Ethernet.IpV4.Tcp.IsValid)
+            {
+                ports = (packet.Ethernet.IpV4.Tcp.SourcePort, packet.Ethernet.IpV4.Tcp.DestinationPort);
+            }
+            else if (packet.Ethernet.IpV4.Udp.IsValid)
+            {
+                ports = (packet.Ethernet.IpV4.Udp.SourcePort, packet.Ethernet.IpV4.Udp.DestinationPort);
+
+            }
+
             // Compare to avoid adding same edge twice
-            // Dicationary is used to do atomic [check if present] + [add]
+            // Dictionary is used to do atomic [check if present] + [add]
             var interaction = sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp);
             if (_interactions.TryGetValue(interaction, out var data))
             {
-                data.AggregateBytes(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count);
+                data.AggregateBytes(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count, ports);
             }
             else
             {
-                _interactions.TryAdd(interaction, new ConcurrentInteractionData(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count));
+                _interactions.TryAdd(interaction, new ConcurrentInteractionData(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(),packet.Count, ports));
             }
         }
 
@@ -949,7 +982,7 @@ namespace NetworkAnalyzer.Core.Analyzers
             }
 
             // TODO: find better criteria? (some service ports may be above 1023)
-            if (packet.Ethernet.IpV4.Tcp.SourcePort > 1024)
+            if (packet.Ethernet.IpV4.Tcp.SourcePort > 1023)
             {
                 return;
             }
@@ -979,8 +1012,11 @@ namespace NetworkAnalyzer.Core.Analyzers
 
         public async ValueTask DisposeAsync()
         {
-            _packetCommunicator.Break();
-            await _packetSniffTask;
+            _packetCommunicator?.Break();
+            if (_packetSniffTask != null)
+            {
+                await _packetSniffTask;
+            }
         }
     }
 }

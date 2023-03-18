@@ -7,10 +7,10 @@ import './Cyber.css'
 import { entityPairToDictionaryKey, ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
-import BandwidthChart from './BandwidthChart';
 import NewConnections from './NewConnections';
 import TrafficIncrease from './TrafficIncrease';
 import { addAnomalousNewConnectionsEdges, addAnomalousTrafficIncreaseEdges, isEdge } from '../AnomalyUtils';
+import InteractionInfo from './InteractionInfo';
 
 function Home() {
 
@@ -28,10 +28,11 @@ function Home() {
     const [subnetFilter, setSubnetFilter] = useState({ inclusion: [], exclusion: [] });
     const [captureLength, setCaptureLength] = useState(60);
 
+    // NICs
     const [nics, setNics] = useState([]);
     const [selectedNic, setSelectedNic] = useState('');
-    const [chartData, setChartData] = useState([1]);
-    const [selectedInteraction, setSelectedInteraction] = useState({ Valid: false, Entity1: '', Entity2: '' });
+
+    const [selectedInteraction, setSelectedInteraction] = useState(null);
     const interactionKeyToData = useRef({});
 
     // Graph
@@ -45,10 +46,6 @@ function Home() {
         'Server': 3,
         'Computer': 4
     };
-
-    useEffect(() => {
-        updateBandwidthGraph();
-    }, [selectedInteraction])
 
 
     ////////////////////////////////////////////////
@@ -87,8 +84,18 @@ function Home() {
     }, [fullGraphInfo, newConnectionsBaseline, subnetFilter, trafficIncreaseParams]);
 
     useEffect(() => {
+
+        document.addEventListener('keydown', (e) => {
+            console.log(e.key);
+            if (e.key === 'Escape') {
+                setSelectedInteraction(null);
+            }
+        })
+
+        // Query NICs
         getNicsApi((nicsJson) => setNics(JSON.parse(nicsJson)));
 
+        // Setup live capture polling timer
         const intervalId = setInterval(() => {
             if (liveCapture.current.Running) {
                 getLiveCaptureDataApi(liveCapture.current.Id, onReceiveNetworkInfoJson);
@@ -160,7 +167,7 @@ function Home() {
 
     function onFileUpload(json) {
         stopLiveCapture();
-        setSelectedInteraction({ Valid: false, Entity1: '', Entity2: '' });
+        setSelectedInteraction(null);
         onReceiveNetworkInfoJson(json);
         setEntityInfoPanelData();
     }
@@ -186,10 +193,8 @@ function Home() {
         setFullGraphInfo({ IsInitial: fullGraphInfo.Elements.length == 0, Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
         interactionKeyToData.current = {};
         for (const interaction of networkInfo.Interactions) {
-            interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])] = [interaction[1], interaction[2]];
+            interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])] = interaction;
         }
-
-        updateBandwidthGraph();
     }
 
     const writeEntityDataToEntityInfo = (nodeId) => {
@@ -269,24 +274,7 @@ function Home() {
 
 
     function onEdgeClick(entity1, entity2) {
-        setSelectedInteraction({ Valid: true, Entity1: entity1, Entity2: entity2 })
-    }
-
-    function updateBandwidthGraph() {
-
-        if (!selectedInteraction.Valid) {
-            setChartData([[0, 0]]);
-            return;
-        }
-
-        var newChartData = [];
-
-        const bytesPerSeconds = interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction.Entity1, selectedInteraction.Entity2)][0];
-        for (const byteCount of bytesPerSeconds) {
-            newChartData.push(byteCount);
-        }
-
-        setChartData(newChartData);
+        setSelectedInteraction(interactionKeyToData.current[entityPairToDictionaryKey(entity1, entity2)])
     }
 
     function onSelectNic(nic) {
@@ -300,7 +288,7 @@ function Home() {
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
         if (liveCaptureIdResponse !== null) {
             liveCapture.current = { Id: liveCaptureIdResponse, Running: true };
-            setSelectedInteraction({ Valid: false, Entity1: '', Entity2: '' })
+            setSelectedInteraction(null)
             resetFullGraphInfo();
         }
         else {
@@ -324,7 +312,7 @@ function Home() {
 
     return (
         <div style={{ fontFamily: 'Arial !important', height: '90vh' }}>
-
+            <InteractionInfo interaction={selectedInteraction}></InteractionInfo>
             <div className={"flex-cyber"} style={{ height: 'fit-content' }}>
                 <CytoscapeWrapper setCyRef={(cy) => cyRef.current = cy}
                     onNodeClick={writeEntityDataToEntityInfo}
@@ -357,9 +345,6 @@ function Home() {
                             <DropDown optionsItems={nics} setSelectedItems={onSelectNic} />
                         </div>
                     </div>
-
-                    <BandwidthChart className={"graph-floating"} chartData={chartData} entity1={selectedInteraction.Entity1} entity2={selectedInteraction.Entity2} />
-
                 </div>
             </div>
 
