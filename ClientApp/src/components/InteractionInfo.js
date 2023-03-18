@@ -11,6 +11,8 @@ function InteractionInfo(props) {
     }, [props.interaction])
 
     useEffect(() => {
+        console.log(interaction);
+
         if (interaction === null) {
             setChartData([[0, 0]]);
             return;
@@ -18,7 +20,7 @@ function InteractionInfo(props) {
 
         var newChartData = [];
 
-        const bytesPerSeconds = interaction[0];
+        const bytesPerSeconds = interaction[1];
         for (const byteCount of bytesPerSeconds) {
             newChartData.push(byteCount);
         }

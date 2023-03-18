@@ -202,44 +202,55 @@ namespace NetworkAnalyzer.Core.Analyzers
 
     class ConcurrentInteractionData
     {
-        public long FirstPacketTimestamp { get; private set; } = long.MaxValue;
-        public long LastPacketTimestamp { get; private set; } = long.MinValue;
+        // Use concurrent dictionary as concurrent hashset for atomic check and add
+        private readonly ConcurrentDictionary<string, bool> _servicePorts = new ConcurrentDictionary<string, bool>();
 
-        // Use Dictionary for atomic check and add
-        public readonly ConcurrentDictionary<int, bool> ServicePorts = new ConcurrentDictionary<int, bool>(); 
+        private readonly ConcurrentDictionary<long, long> _bytesPerSecond = new ConcurrentDictionary<long, long>();
 
-        public readonly ConcurrentDictionary<long, long> _bytesPerSecond = new ConcurrentDictionary<long, long>();
-
-        private void AggregateBytesHelper(long timestamp, (int Port1, int Port2)? ports = null)
+        public List<string> ServicePorts
         {
-            FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
-            LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
-
-            if (ports != null)
+            get
             {
-                int port1 = ports.Value.Port1, port2 = ports.Value.Port2;
-                if (port1 <= 1023)
-                {
-                    ServicePorts[port1] = true;
-                }
-
-                if (port2 <= 1023)
-                {
-                    ServicePorts[port2] = true;
-                }
+                return _servicePorts.Select(kvp => kvp.Key).ToList();
             }
         }
 
-        public void AggregateBytes(long timestamp, long bytes, (int Port1, int Port2)? ports = null)
+        public List<long[]> BytesPerSecond
         {
-            _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
-            AggregateBytesHelper(timestamp, ports);
+            get
+            {
+                return _bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new long[] { kvp.Key, kvp.Value }).ToList();
+            }
         }
 
-        public ConcurrentInteractionData(long timestamp, long bytes, (int Port1, int Port2)? ports = null)
+        public long FirstPacketTimestamp { get; private set; } = long.MaxValue;
+        public long LastPacketTimestamp { get; private set; } = long.MinValue;
+
+        private void AggregateBytesHelper(long timestamp)
+        {
+            FirstPacketTimestamp = Math.Min(FirstPacketTimestamp, timestamp);
+            LastPacketTimestamp = Math.Max(FirstPacketTimestamp, timestamp);
+        }
+
+        public void TryAddService(string service)
+        {
+            if (string.IsNullOrEmpty(service))
+            {
+                return;
+            }
+
+            _servicePorts[service] = true;
+        }
+
+        public void AggregateBytes(long timestamp, long bytes)
+        {
+            _bytesPerSecond.AddOrUpdate(timestamp, bytes, (key, value) => value + bytes);
+            AggregateBytesHelper(timestamp);
+        }
+
+        public ConcurrentInteractionData(long timestamp, long bytes)
         {
             _bytesPerSecond[timestamp] = bytes;
-            AggregateBytesHelper(timestamp, ports);
         }
     }
 
@@ -427,9 +438,9 @@ namespace NetworkAnalyzer.Core.Analyzers
                 .Select(interaction => new object[]
                 { 
                     new string[] { interaction.Key.Item1, interaction.Key.Item2 },
-                    interaction.Value._bytesPerSecond.OrderBy(bps => bps.Key).Select(kvp => new object[] { kvp.Key, kvp.Value }),
+                    interaction.Value.BytesPerSecond,
                     interaction.Value.FirstPacketTimestamp,
-                    interaction.Value.ServicePorts.Select(kvp => kvp.Key)
+                    interaction.Value.ServicePorts
                 }),
 
                 EntityPositions = subnetEntityPositions,
@@ -950,28 +961,38 @@ namespace NetworkAnalyzer.Core.Analyzers
                 return;
             }
 
-            (int Port1, int Port2)? ports = null;
+
+            string serviceName = null;
             if (packet.Ethernet.IpV4.Tcp.IsValid)
             {
-                ports = (packet.Ethernet.IpV4.Tcp.SourcePort, packet.Ethernet.IpV4.Tcp.DestinationPort);
+                if (!TcpPortToServiceName.TryGetValue(packet.Ethernet.IpV4.Tcp.SourcePort, out serviceName))
+                {
+                    TcpPortToServiceName.TryGetValue(packet.Ethernet.IpV4.Tcp.DestinationPort, out serviceName);
+                }
             }
             else if (packet.Ethernet.IpV4.Udp.IsValid)
             {
-                ports = (packet.Ethernet.IpV4.Udp.SourcePort, packet.Ethernet.IpV4.Udp.DestinationPort);
-
+                if (!UdpPortToServiceName.TryGetValue(packet.Ethernet.IpV4.Udp.SourcePort, out serviceName))
+                {
+                    UdpPortToServiceName.TryGetValue(packet.Ethernet.IpV4.Udp.DestinationPort, out serviceName);
+                }
             }
 
             // Compare to avoid adding same edge twice
             // Dictionary is used to do atomic [check if present] + [add]
             var interaction = sourceIp.CompareTo(destIp) < 0 ? (sourceIp, destIp) : (destIp, sourceIp);
-            if (_interactions.TryGetValue(interaction, out var data))
+            ConcurrentInteractionData data = null;
+            if (_interactions.TryGetValue(interaction, out data))
             {
-                data.AggregateBytes(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count, ports);
+                data.AggregateBytes(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count);
             }
             else
             {
-                _interactions.TryAdd(interaction, new ConcurrentInteractionData(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(),packet.Count, ports));
+                data = new ConcurrentInteractionData(((DateTimeOffset)packet.Timestamp).ToUnixTimeSeconds(), packet.Count);
+                _interactions.TryAdd(interaction, data);
             }
+
+            data.TryAddService(serviceName);
         }
 
         private void TryExtractDeviceServiceFromPort(Packet packet)

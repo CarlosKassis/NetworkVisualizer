@@ -80,7 +80,6 @@ function BandwidthChart(props) {
     }, [chartContainer])
 
     useEffect(() => {
-
         tryInitializeChartInstance();
         if (props.chartData.length == 0) {
             return;

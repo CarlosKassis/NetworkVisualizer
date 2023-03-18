@@ -85,8 +85,8 @@ function Home() {
 
     useEffect(() => {
 
+        // List for 'Cancel' key
         document.addEventListener('keydown', (e) => {
-            console.log(e.key);
             if (e.key === 'Escape') {
                 setSelectedInteraction(null);
             }
@@ -347,7 +347,6 @@ function Home() {
                     </div>
                 </div>
             </div>
-
         </div>
     );
 }
