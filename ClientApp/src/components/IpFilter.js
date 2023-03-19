@@ -44,11 +44,18 @@ function IpFilter(props) {
         setValidInput(false);
     }
 
+    function onKeyDown(event) {
+        // 'Enter' key
+        if (event.which == 13) {
+            props.onSubmitKey();
+        }
+    }
+
     return (
         <div>
-            <h3 style={{ fontSize: '1.75vh' }}>{`${props.filterType}:`}</h3>
-            <input style={{ width: '100%', marginBottom: '1vh' }} ref={filterInput} onChange={handleInputChange}></input>
-            {!validInput && <p style={{ color: '#F77', fontSize: '1.5vh' }}><b>Valid Input: 192.168.1.0/24, 1.1.1.1, ...</b></p>}
+            <h3 style={{ fontSize: '1.5vh' }}>{`${props.filterType}:`}</h3>
+            <input onKeyDown={onKeyDown } style={{ width: '100%', marginBottom: '1vh' }} ref={filterInput} onChange={handleInputChange}></input>
+            {!validInput && <p style={{ color: '#F77', fontSize: '1.25vh' }}><b>Valid Input: 192.168.1.0/24, 1.1.1.1, ...</b></p>}
         </div>
     );
 }

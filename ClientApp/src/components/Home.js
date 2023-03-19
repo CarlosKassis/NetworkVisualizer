@@ -25,7 +25,7 @@ function Home() {
     const interactions = useRef([]);
 
     const [entityInfo, setEntityInfo] = useState({ ip: null, os: null, mac: null, hostname: null, domain: null, services: null });
-    const [subnetFilter, setSubnetFilter] = useState({ inclusion: [], exclusion: [] });
+    const [graphFilterParams, setGraphFilterParams] = useState({ inclusion: [], exclusion: [], services: [] });
     const [captureLength, setCaptureLength] = useState(60);
 
     // NICs
@@ -81,7 +81,7 @@ function Home() {
             cyRef.current.center();
         }
 
-    }, [fullGraphInfo, newConnectionsBaseline, subnetFilter, trafficIncreaseParams]);
+    }, [fullGraphInfo, newConnectionsBaseline, graphFilterParams, trafficIncreaseParams]);
 
     useEffect(() => {
 
@@ -97,6 +97,11 @@ function Home() {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 setSelectedInteraction(null);
+            }
+
+            // '`' key
+            if (e.keyCode === 192) {
+                cyRef.current.center();
             }
         })
 
@@ -130,24 +135,49 @@ function Home() {
         }
     }
 
-    function onFilterGraph(inclusionString, exclusionString) {
+    function onFilterGraph(inclusionString, exclusionString, serviceString) {
 
         var newSubnetInclusions = [];
         var newSubnetExclusions = [];
+        var newServices = serviceString === '' ? [] : serviceString.split(',').map((str) => str.trim().toLowerCase());
 
         tryFillIpFiltersFromString(newSubnetInclusions, inclusionString);
         tryFillIpFiltersFromString(newSubnetExclusions, exclusionString);
-
-        setSubnetFilter({
+ 
+        setGraphFilterParams({
             "inclusion": newSubnetInclusions,
-            "exclusion": newSubnetExclusions
+            "exclusion": newSubnetExclusions,
+            "services": newServices
         })
     }
 
     function getFilteredGraphElements() {
         return fullGraphInfo.Elements.filter((element) => {
             if (element.data.source) {
-                return shouldIpBeDisplayedOnGraph(element.data.source) && shouldIpBeDisplayedOnGraph(element.data.target)
+                if (graphFilterParams.services.length > 0) {
+                    const interactionServices = interactionKeyToData.current[entityPairToDictionaryKey(element.data.source, element.data.target)][3];
+                    if (!graphFilterParams.services.some((filterService) => {
+                        for (const interactionService of interactionServices) {
+                            if (interactionService.toLowerCase() == filterService) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    })) {
+                        return false;
+                    }
+                }
+
+                if (shouldIpBeDisplayedOnGraph(element.data.source) && shouldIpBeDisplayedOnGraph(element.data.target)) {
+                    return true;
+                }
+
+                if (graphFilterParams.services.size == 0) {
+                    return false;
+                }
+
+                return false;
             }
 
             return shouldIpBeDisplayedOnGraph(element.data.id);
@@ -156,16 +186,16 @@ function Home() {
 
     function shouldIpBeDisplayedOnGraph(ip) {
 
-        if (subnetFilter.exclusion.length > 0) {
+        if (graphFilterParams.exclusion.length > 0) {
             const ipInteger = ipToInteger(ip);
-            if (subnetFilter.exclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
+            if (graphFilterParams.exclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
                 return false;
             }
         }
 
-        if (subnetFilter.inclusion.length > 0) {
+        if (graphFilterParams.inclusion.length > 0) {
             const ipInteger = ipToInteger(ip);
-            if (!subnetFilter.inclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
+            if (!graphFilterParams.inclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
                 return false;
             }
         }

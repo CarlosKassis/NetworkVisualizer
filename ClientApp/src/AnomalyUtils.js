@@ -10,7 +10,6 @@ export function addAnomalousNewConnectionsEdges(elements, finalElements, interac
 }
 
 export function addAnomalousTrafficIncreaseEdges(elements, finalElements, interactions, baseline, increase, captureStartTime) {
-    console.log(baseline + ' ' + increase)
     const newConnections = getTrafficIncreaseElements(baseline, increase, captureStartTime, interactions);
     for (const element of elements.filter(ele1 => isEdge(ele1) && newConnections.has(entityPairToDictionaryKey(ele1.data.source, ele1.data.target)))) {
         element.classes = "edgetrafficincrease";
