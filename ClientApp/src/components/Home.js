@@ -139,7 +139,7 @@ function Home() {
 
         var newSubnetInclusions = [];
         var newSubnetExclusions = [];
-        var newServices = serviceString === '' ? [] : serviceString.split(',').map((str) => str.trim().toLowerCase());
+        var newServices = (serviceString === null || serviceString === '') ? [] : serviceString.split(',').map((str) => str.trim().toLowerCase());
 
         tryFillIpFiltersFromString(newSubnetInclusions, inclusionString);
         tryFillIpFiltersFromString(newSubnetExclusions, exclusionString);
