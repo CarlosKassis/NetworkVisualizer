@@ -62,6 +62,15 @@ function BandwidthChart(props) {
                     suggestedMin: 0,
                     suggestedMax: 5
                 }
+            },
+            tooltips: {
+                callbacks: {
+                    label: function (tooltipItem, data) {
+                        console.log('aaaaaaaaaa')
+                        var value = data.datasets[0].data[tooltipItem.index];
+                        return value;
+                    },
+                },
             }
         },
     };
@@ -89,7 +98,7 @@ function BandwidthChart(props) {
         chartInstance.current.data.datasets[0].data = [];
 
         for (let i = 0; i < props.chartData.length; i++) {
-            chartInstance.current.data.labels.push(props.chartData[i][0]);
+            chartInstance.current.data.labels.push(props.chartData[i][0] * 1000);
             chartInstance.current.data.datasets[0].data.push(props.chartData[i][1]);
         }
 

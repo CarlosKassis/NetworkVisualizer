@@ -15,7 +15,7 @@ function TrafficIncrease(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '100%' }} >
             <h3 className={"graph-control-title"}><b>Traffic Increase</b></h3>
-            <PercentOrTimeInput captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onTimeChange={(time) => setBaseline(time)}></PercentOrTimeInput>
+            <PercentOrTimeInput textEnabled={false} captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onTimeChange={(time) => setBaseline(time)}></PercentOrTimeInput>
             <PercentInput title={"Increase [%]"} onRatioChange={(ratio) => setIncrease(ratio)}></PercentInput>
         </div>
     );

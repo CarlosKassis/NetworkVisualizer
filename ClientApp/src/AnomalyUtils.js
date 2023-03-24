@@ -9,8 +9,8 @@ export function addAnomalousNewConnectionsEdges(elements, finalElements, interac
     }
 }
 
-export function addAnomalousTrafficIncreaseEdges(elements, finalElements, interactions, baseline, increase, captureStartTime) {
-    const newConnections = getTrafficIncreaseElements(baseline, increase, captureStartTime, interactions);
+export function addAnomalousTrafficIncreaseEdges(elements, finalElements, interactions, baseline, increase, captureStartTime, captureEndTime) {
+    const newConnections = getTrafficIncreaseElements(baseline, increase, captureStartTime, captureEndTime, interactions);
     for (const element of elements.filter(ele1 => isEdge(ele1) && newConnections.has(entityPairToDictionaryKey(ele1.data.source, ele1.data.target)))) {
         element.classes = "edgetrafficincrease";
         finalElements.push(element);
@@ -31,23 +31,31 @@ function getNewConnectionsElements(baseline, captureStartTime, interactions) {
     return newConnections;
 }
 
-function getTrafficIncreaseElements(baseline, increase, captureStartTime, interactions) {
+function getTrafficIncreaseElements(baseline, increase, captureStartTime, captureEndTime, interactions) {
 
     const trafficIncreasements = new Set();
     for (const interaction of interactions) {
-        var maxBpsBaseline = 0, maxBpsAfterBaseline = 0;
+        var maxBpsBaseline = null, maxBpsAfterBaseline = null;
         if (interaction[1].length <= 1) {
-            return trafficIncreasements;
+            continue;
         }
 
+        const baselineFromFullCaptureTimeToInteractionTime = (baseline / (captureEndTime - captureStartTime)) * (interaction[1][interaction[1].length - 1][0] - interaction[1][0][0]);
+        const firstPacketTimestamp = interaction[1][0][0];
         for (const point of interaction[1]) {
-            if (point[0] - captureStartTime < baseline) {
-                maxBpsBaseline = Math.max(maxBpsBaseline, point[1]);
+            if (point[0] - firstPacketTimestamp < baselineFromFullCaptureTimeToInteractionTime) {
+                maxBpsBaseline = maxBpsBaseline == null ? point[1] : Math.max(maxBpsBaseline, point[1]);
             } else {
-                maxBpsAfterBaseline = Math.max(maxBpsAfterBaseline, point[1]);
+                maxBpsAfterBaseline = maxBpsAfterBaseline == null ? point[1] : Math.max(maxBpsAfterBaseline, point[1]);
             }
         }
 
+        if (maxBpsBaseline === null || maxBpsAfterBaseline === null) {
+            continue;
+        }
+
+        console.log(maxBpsBaseline + ', ' + maxBpsAfterBaseline);
+        console.log(increase)
         if (maxBpsBaseline * (1 + increase) <= maxBpsAfterBaseline) {
             trafficIncreasements.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
         }

@@ -69,7 +69,7 @@ function Home() {
             }
 
             if (trafficIncreaseParams !== null) {
-                addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase, fullGraphInfo.CaptureStartTimestamp);
+                addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase, fullGraphInfo.CaptureStartTimestamp, fullGraphInfo.CaptureEndTimestamp);
             }
 
             cyRef.current.json({ elements: filteredAnomalousElements });

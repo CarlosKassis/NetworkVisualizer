@@ -88,9 +88,9 @@ function PercentOrTimeInput(props) {
             <h3 style={{ marginTop: '10px' }}>{`${props.title}:`}</h3>
             <div className={"flex-cyber"}>
                 <input onChange={handleInputChange} style={{ width: '100px', marginTop: '5px' }} />
-                <h3 style={{ marginTop: '7px', marginLeft: '10px' }}>
+                {props.textEnabled && <h3 style={{ marginTop: '7px', marginLeft: '10px' }}>
                     {`${secondsToTimeString(displayTime)}/${secondsToTimeString(props.captureLength)}`}
-                </h3>
+                </h3>}
             </div>
             {errorMessage !== '' && <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>{errorMessage}</b></p>}
         </div>

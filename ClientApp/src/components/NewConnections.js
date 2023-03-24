@@ -13,7 +13,7 @@ function NewConnections(props) {
     return (
         <div className={"user-control-part graph-floating"} style={{ width: '100%' }} >
             <h3 className={"graph-control-title"}><b>New Connections</b></h3>
-            <PercentOrTimeInput captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onTimeChange={(time) => setBaseline(time)}></PercentOrTimeInput>
+            <PercentOrTimeInput textEnabled={true} captureLength={props.captureLength} title={"Baseline [%,s,m,h,d]"} onTimeChange={(time) => setBaseline(time)}></PercentOrTimeInput>
         </div>
     );
 }
