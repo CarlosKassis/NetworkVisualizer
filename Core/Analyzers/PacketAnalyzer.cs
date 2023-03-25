@@ -1034,6 +1034,7 @@ namespace NetworkAnalyzer.Core.Analyzers
         public async ValueTask DisposeAsync()
         {
             _packetCommunicator?.Break();
+            _packetCommunicator?.Dispose();
             if (_packetSniffTask != null)
             {
                 await _packetSniffTask;
