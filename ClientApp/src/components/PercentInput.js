@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { parsePercentage, parseTime } from '../Utils'
+import { parsePercentage } from '../Utils'
 
 // Component that takes percentage input from field and returns normalized percentage ('65%' => 0.65)
 function PercentOrTimeInput(props) {
@@ -15,7 +15,7 @@ function PercentOrTimeInput(props) {
 
         const percentage = parsePercentage(input);
         if (!isNaN(percentage)) {
-            onValidRatioChange(percentage / 100.0)
+            onValidInputChange(percentage)
             return;
         }
 
@@ -26,14 +26,14 @@ function PercentOrTimeInput(props) {
         setInput(event.target.value);
     }
 
-    function onValidRatioChange(ratio) {
+    function onValidInputChange(percentage) {
         setErrorMessage('');
-        props.onRatioChange(ratio);
+        props.onPercentageChange(percentage);
     }
 
     function onInvalidRatioChange(errorMessage) {
         setErrorMessage(errorMessage);
-        props.onRatioChange(null);
+        props.onPercentageChange(null);
     }
 
     return (

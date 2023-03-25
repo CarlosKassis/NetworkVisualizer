@@ -48,9 +48,10 @@ function BandwidthChart(props) {
                     display: true,
                     type: 'time',
                     time: {
-                        ticks: {
-                            source: 'auto'
-                        }
+                        unit: 'second'
+                    },
+                    ticks: {
+                        source: 'auto'
                     }
                 },
                 y: {
@@ -66,7 +67,6 @@ function BandwidthChart(props) {
             tooltips: {
                 callbacks: {
                     label: function (tooltipItem, data) {
-                        console.log('aaaaaaaaaa')
                         var value = data.datasets[0].data[tooltipItem.index];
                         return value;
                     },

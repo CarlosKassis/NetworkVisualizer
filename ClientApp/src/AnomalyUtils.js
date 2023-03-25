@@ -1,16 +1,16 @@
 import { entityPairToDictionaryKey } from "./Utils";
 
 // Assumes baseline != null
-export function addAnomalousNewConnectionsEdges(elements, finalElements, interactions, baseline, captureStartTime) {
-    const newConnections = getNewConnectionsElements(baseline, captureStartTime, interactions);
+export function addAnomalousNewConnectionsEdges(elements, finalElements, interactions, baseline, captureStartTime, captureEndTime) {
+    const newConnections = getNewConnectionsElements(baseline, captureStartTime, captureEndTime, interactions);
     for (const element of elements.filter(ele1 => isEdge(ele1) && newConnections.has(entityPairToDictionaryKey(ele1.data.source, ele1.data.target)))) {
         element.classes = "edgenewconnection";
         finalElements.push(element);
     }
 }
 
-export function addAnomalousTrafficIncreaseEdges(elements, finalElements, interactions, baseline, increase, captureStartTime, captureEndTime) {
-    const newConnections = getTrafficIncreaseElements(baseline, increase, captureStartTime, captureEndTime, interactions);
+export function addAnomalousTrafficIncreaseEdges(elements, finalElements, interactions, baseline, increase) {
+    const newConnections = getTrafficIncreaseElements(baseline, increase, interactions);
     for (const element of elements.filter(ele1 => isEdge(ele1) && newConnections.has(entityPairToDictionaryKey(ele1.data.source, ele1.data.target)))) {
         element.classes = "edgetrafficincrease";
         finalElements.push(element);
@@ -21,17 +21,23 @@ export function isEdge(element) {
     return element.data.source !== undefined;
 }
 
-function getNewConnectionsElements(baseline, captureStartTime, interactions) {
+function getNewConnectionsElements(baseline, captureStartTime, captureEndTime, interactions) {
+    var baselineTimeInSeconds;
+    if (baseline.Percentage !== null) {
+        baselineTimeInSeconds = (captureEndTime - captureStartTime) * (baseline.Percentage) / 100.0;
+    } else {
+        baselineTimeInSeconds = baseline.TimeInSeconds;
+    }
 
     const newConnections = new Set();
-    for (const interaction of interactions.filter(inter1 => inter1[2] >= captureStartTime + baseline)) {
+    for (const interaction of interactions.filter(inter1 => inter1[2] >= captureStartTime + baselineTimeInSeconds)) {
         newConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
     }
 
     return newConnections;
 }
 
-function getTrafficIncreaseElements(baseline, increase, captureStartTime, captureEndTime, interactions) {
+function getTrafficIncreaseElements(baseline, increase, interactions) {
 
     const trafficIncreasements = new Set();
     for (const interaction of interactions) {
@@ -40,10 +46,10 @@ function getTrafficIncreaseElements(baseline, increase, captureStartTime, captur
             continue;
         }
 
-        const baselineFromFullCaptureTimeToInteractionTime = (baseline / (captureEndTime - captureStartTime)) * (interaction[1][interaction[1].length - 1][0] - interaction[1][0][0]);
+        const baselineOfInteractionTime = (interaction[1][interaction[1].length - 1][0] - interaction[1][0][0]) * (baseline / 100.0);
         const firstPacketTimestamp = interaction[1][0][0];
         for (const point of interaction[1]) {
-            if (point[0] - firstPacketTimestamp < baselineFromFullCaptureTimeToInteractionTime) {
+            if (point[0] - firstPacketTimestamp < baselineOfInteractionTime) {
                 maxBpsBaseline = maxBpsBaseline == null ? point[1] : Math.max(maxBpsBaseline, point[1]);
             } else {
                 maxBpsAfterBaseline = maxBpsAfterBaseline == null ? point[1] : Math.max(maxBpsAfterBaseline, point[1]);
@@ -54,10 +60,10 @@ function getTrafficIncreaseElements(baseline, increase, captureStartTime, captur
             continue;
         }
 
-        console.log(maxBpsBaseline + ', ' + maxBpsAfterBaseline);
-        console.log(increase)
-        if (maxBpsBaseline * (1 + increase) <= maxBpsAfterBaseline) {
+        if (maxBpsBaseline * (1 + (increase / 100.0)) <= maxBpsAfterBaseline) {
             trafficIncreasements.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
+            console.log(interaction);
+            console.log(maxBpsBaseline + ' , ' + maxBpsAfterBaseline);
         }
     }
 

@@ -65,11 +65,11 @@ function Home() {
         const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
         if (newConnectionsBaseline !== null || trafficIncreaseParams !== null) {
             if (newConnectionsBaseline !== null) {
-                addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp);
+                addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp, fullGraphInfo.CaptureEndTimestamp);
             }
 
             if (trafficIncreaseParams !== null) {
-                addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase, fullGraphInfo.CaptureStartTimestamp, fullGraphInfo.CaptureEndTimestamp);
+                addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase);
             }
 
             cyRef.current.json({ elements: filteredAnomalousElements });

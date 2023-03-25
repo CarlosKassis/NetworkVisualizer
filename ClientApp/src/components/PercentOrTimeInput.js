@@ -6,7 +6,7 @@ function PercentOrTimeInput(props) {
 
     const [errorMessage, setErrorMessage] = useState('');
     const [input, setInput] = useState(null);
-    const [displayTime, setDisplayTime] = useState(null);
+    const [percentOrTime, setPercentOrTime] = useState(null);
 
     useEffect(() => {
         if (input == null || input == '') {
@@ -16,23 +16,23 @@ function PercentOrTimeInput(props) {
 
         const percentage = parsePercentage(input);
         if (!isNaN(percentage)) {
-            if (percentage <= 0.0001 || percentage > 100.0) {
+            if (percentage <= 0.0001 || percentage >= 100.0) {
                 onInputChangeInvalid('Valid percentage: 0% < P <= 100%');
                 return;
             }
 
-            onInputChangeValid(props.captureLength * percentage / 100.0)
+            onInputChangeValid({ Percentage: percentage, TimeInSeconds: null });
             return;
         }
 
-        const time = parseTime(input);
-        if (!isNaN(time)) {
-            if (time <= 0.0001) {
+        const timeInSeconds = parseTime(input);
+        if (!isNaN(timeInSeconds)) {
+            if (timeInSeconds <= 0.0001) {
                 onInputChangeInvalid('Time must be positive');
                 return;
             }
 
-            onInputChangeValid(time);
+            onInputChangeValid({ Percentage: null, TimeInSeconds: timeInSeconds });
             return;
         }
 
@@ -43,36 +43,46 @@ function PercentOrTimeInput(props) {
         setInput(event.target.value);
     }
 
-    function onInputChangeValid(time) {
+    function onInputChangeValid(input) {
         setErrorMessage('');
-        props.onTimeChange(time);
-        setDisplayTime(time);
+        props.onInputChange(input);
+        setPercentOrTime(input);
     }
 
     function onInputChangeInvalid(errorMessage) {
         setErrorMessage(errorMessage);
-        props.onTimeChange(null);
-        setDisplayTime(null);
+        props.onInputChange(null);
+        setPercentOrTime(null);
     }
 
-    function secondsToTimeString(seconds) {
-        if (seconds === null) {
-            return '?';
+    function timeInSecondsToString(timeInSeconds) {
+        if (timeInSeconds < 60) {
+            return `${numberToPrettyString(timeInSeconds)}s`
         }
 
-        if (seconds < 60) {
-            return `${numberToPrettyString(seconds)}s`
+        if (timeInSeconds < 60 * 60) {
+            return `${numberToPrettyString(timeInSeconds / 60)}m`
         }
 
-        if (seconds < 60 * 60) {
-            return `${numberToPrettyString(seconds / 60)}m`
+        if (timeInSeconds < 60 * 60 * 24) {
+            return `${numberToPrettyString(timeInSeconds / (60 * 60))}h`
         }
 
-        if (seconds < 60 * 60 * 24) {
-            return `${numberToPrettyString(seconds / (60 * 60))}h`
+        return `${numberToPrettyString(timeInSeconds / (60 * 60 * 24))}d`
+    }
+
+    function timeDisplay() {
+        if (percentOrTime === null) {
+            return `?/${timeInSecondsToString(props.captureLength)}`
         }
 
-        return `${numberToPrettyString(seconds / (60 * 60 * 24))}d`
+        if (percentOrTime.Percentage !== null) {
+            return `${timeInSecondsToString(props.captureLength * (percentOrTime.Percentage / 100.0))}/${timeInSecondsToString(props.captureLength)}`
+        }
+
+        if (percentOrTime.TimeInSeconds !== null) {
+            return `${timeInSecondsToString(percentOrTime.TimeInSeconds)}/${timeInSecondsToString(props.captureLength)}`
+        }
     }
 
     function numberToPrettyString(number) {
@@ -88,9 +98,7 @@ function PercentOrTimeInput(props) {
             <h3 style={{ marginTop: '10px' }}>{`${props.title}:`}</h3>
             <div className={"flex-cyber"}>
                 <input onChange={handleInputChange} style={{ width: '100px', marginTop: '5px' }} />
-                {props.textEnabled && <h3 style={{ marginTop: '7px', marginLeft: '10px' }}>
-                    {`${secondsToTimeString(displayTime)}/${secondsToTimeString(props.captureLength)}`}
-                </h3>}
+                <h3 style={{ marginTop: '7px', marginLeft: '10px' }}>{timeDisplay()}</h3>
             </div>
             {errorMessage !== '' && <p style={{ color: '#F77', fontSize: '13px', width: '600px', marginTop: '5px' }}><b>{errorMessage}</b></p>}
         </div>

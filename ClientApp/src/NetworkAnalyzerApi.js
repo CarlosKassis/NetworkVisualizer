@@ -34,6 +34,10 @@ export function startLiveCaptureApi(selectedNic, onStartLiveCaptureResponse) {
 }
 
 export function stopLiveCaptureApi(liveCaptureId) {
+    if (liveCaptureId === null) {
+        return;
+    }
+
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `networkanalyzer/live/stop?liveCaptureId=${liveCaptureId}`);
     xhr.send(null);
