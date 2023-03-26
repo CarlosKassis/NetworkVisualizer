@@ -348,7 +348,17 @@ namespace NetworkAnalyzer.Core.Analyzers
         public void Initialize(PacketDevice packetDevice, PacketAnalysisTiming packetAnalysisTiming)
         {
             _packetCommunicator = packetDevice.Open(65536, PacketDeviceOpenAttributes.Promiscuous, 1000);
-            _packetSniffTask = Task.Run(() => _packetCommunicator.ReceivePackets(0, packetAnalysisTiming == PacketAnalysisTiming.Aggregate ? AggregatePacketToMemory : AnalyzePacket));
+            _packetSniffTask = Task.Run(() =>
+            {
+                try
+                {
+                    _packetCommunicator.ReceivePackets(0, packetAnalysisTiming == PacketAnalysisTiming.Aggregate ? AggregatePacketToMemory : AnalyzePacket);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"{nameof(_packetCommunicator.ReceivePackets)} threw exception: {ex.Message}");
+                }
+            });
         }
 
         public async Task<string> GetCytoscapeGraphJson(bool waitForPacketDeviceEof)
@@ -1033,11 +1043,18 @@ namespace NetworkAnalyzer.Core.Analyzers
 
         public async ValueTask DisposeAsync()
         {
-            _packetCommunicator?.Break();
-            _packetCommunicator?.Dispose();
-            if (_packetSniffTask != null)
+            try
             {
-                await _packetSniffTask;
+                _packetCommunicator?.Break();
+                _packetCommunicator?.Dispose();
+                if (_packetSniffTask != null)
+                {
+                    await _packetSniffTask;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Failed to dispose {nameof(PacketAnalyzer)}: {ex.Message}");
             }
         }
     }

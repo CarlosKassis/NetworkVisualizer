@@ -23,14 +23,7 @@ function BandwidthChart(props) {
                 },
                 lineTension: 0.1,
                 cubicInterpolationMode: 'bezier'
-            },
-            /*{
-                label: 'Cubic interpolation',
-                data: datapoints,
-                borderColor: 'rgb(255, 0, 0)',
-                fill: false,
-                tension: 0.4
-            }*/
+            }
         ]
     };
 
@@ -58,19 +51,33 @@ function BandwidthChart(props) {
                     display: true,
                     title: {
                         display: true,
-                        text: 'Bytes/Second'
+                        text: 'Throughput [Bytes/Second]'
                     },
                     suggestedMin: 0,
                     suggestedMax: 5
                 }
             },
-            tooltips: {
-                callbacks: {
-                    label: function (tooltipItem, data) {
-                        var value = data.datasets[0].data[tooltipItem.index];
-                        return value;
-                    },
-                },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function (e) {
+                            const time = new Date(e[0].parsed.x).toLocaleString();
+
+                            const bps = e[0].parsed.y;
+                            if (bps < 1000) {
+                                return `${time} - ${bps} B/s`
+                            }
+                            if (bps < 1000000) {
+                                return `${time} - ${bps/1000} KB/s`
+                            }
+                            if (bps < 1000000000) {
+                                return `${time} - ${bps / 1000000} MB/s`
+                            }
+
+                            return `${bps / 1000000000} GB/s`
+                        }
+                    }
+                }
             }
         },
     };
@@ -98,11 +105,16 @@ function BandwidthChart(props) {
         chartInstance.current.data.datasets[0].data = [];
 
         for (let i = 0; i < props.chartData.length; i++) {
-            chartInstance.current.data.labels.push(props.chartData[i][0] * 1000);
-            chartInstance.current.data.datasets[0].data.push(props.chartData[i][1]);
+            const point = props.chartData[i];
+            if (point[0] == 0) {
+                continue;
+            }
+
+            chartInstance.current.data.labels.push(point[0] * 1000); // MS to Second
+            chartInstance.current.data.datasets[0].data.push(point[1]);
         }
 
-        chartInstance.current.data.datasets[0].label = `${props.entity1} - ${props.entity2}`;
+        chartInstance.current.data.datasets[0].label = `Traffic throughput: ${props.entity1} - ${props.entity2}`;
 
         chartInstance.current.update('none');
     }, [props.chartData]);

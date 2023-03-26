@@ -14,7 +14,8 @@ import InteractionInfo from './InteractionInfo';
 
 function Home() {
 
-    const [fullGraphInfo, setFullGraphInfo] = useState({ IsInitial: true, Elements: [] });
+    const [fullGraphInfo, setFullGraphInfo] = useState({ Elements: [] });
+    const [graphCentered, setGraphCentered] = useState(false);
 
     // Anomaly
     const [newConnectionsBaseline, setNewConnectionsBaseline] = useState(null);
@@ -54,6 +55,10 @@ function Home() {
     useEffect(() => {
         const filteredElements = getFilteredGraphElements();
 
+        if (selectedInteraction !== null) {
+            setSelectedInteraction(interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction[0][0], selectedInteraction[0][1])])
+        }
+
         // Reset edge class
         for (const element of filteredElements) {
             if (isEdge(element)) {
@@ -77,8 +82,9 @@ function Home() {
             cyRef.current.json({ elements: filteredElements });
         }
 
-        if (fullGraphInfo.IsInitial) {
+        if (!graphCentered && fullGraphInfo.Elements.length > 0) {
             cyRef.current.center();
+            setGraphCentered(true);
         }
 
     }, [fullGraphInfo, newConnectionsBaseline, graphFilterParams, trafficIncreaseParams]);
@@ -205,6 +211,7 @@ function Home() {
 
     function onFileUpload(json) {
         stopLiveCapture();
+        resetFullGraphInfo();
         setSelectedInteraction(null);
         onReceiveNetworkInfoJson(json);
         setEntityInfoPanelData();
@@ -228,7 +235,7 @@ function Home() {
         const newFullGraphElements = generateGraphElements(networkInfo);
         interactions.current = networkInfo.Interactions;
 
-        setFullGraphInfo({ IsInitial: fullGraphInfo.Elements.length == 0, Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
+        setFullGraphInfo({ Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
         interactionKeyToData.current = {};
         for (const interaction of networkInfo.Interactions) {
             interactionKeyToData.current[entityPairToDictionaryKey(interaction[0][0], interaction[0][1])] = interaction;
@@ -320,7 +327,8 @@ function Home() {
     }
 
     function resetFullGraphInfo() {
-        setFullGraphInfo({ IsInitial: true, Elements: [] });
+        setFullGraphInfo({ Elements: [] });
+        setGraphCentered(false);
     }
 
     function onStartLiveCaptureResponse(liveCaptureIdResponse) {
