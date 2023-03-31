@@ -4,13 +4,14 @@ import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
 import './Cyber.css'
-import { entityPairToDictionaryKey, ipMaskToInteger, ipToInteger, isIpInSubnet, } from '../Utils'
+import { entityPairToDictionaryKey, ipMaskToInteger, ipToInteger, isIpInSubnet, tryFillIpFiltersFromString } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
 import NewConnections from './NewConnections';
 import TrafficIncrease from './TrafficIncrease';
 import { addAnomalousNewConnectionsEdges, addAnomalousTrafficIncreaseEdges, isEdge } from '../AnomalyUtils';
 import InteractionInfo from './InteractionInfo';
+import { generateGraphElements } from '../GraphUtils';
 
 function Home() {
 
@@ -39,21 +40,11 @@ function Home() {
     // Graph
     const cyRef = useRef(null);
 
-    const EntityType =
-    {
-        'Gateway': 0,
-        'DHCP': 1,
-        'DNS': 2,
-        'Server': 3,
-        'Computer': 4
-    };
-
-
     ////////////////////////////////////////////////
     /// Main pipeline for showing graph elements ///
     ////////////////////////////////////////////////
     useEffect(() => {
-        const filteredElements = getFilteredGraphElements();
+        var filteredElements = getFilteredGraphElements();
 
         if (selectedInteraction !== null) {
             setSelectedInteraction(interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction[0][0], selectedInteraction[0][1])])
@@ -69,6 +60,7 @@ function Home() {
         // Decide if to display gathered anomalous edges or all edges
         const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
         if (newConnectionsBaseline !== null || trafficIncreaseParams !== null) {
+            filteredElements = filteredElements.filter(element => !isEdge(element));
             if (newConnectionsBaseline !== null) {
                 addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp, fullGraphInfo.CaptureEndTimestamp);
             }
@@ -76,13 +68,11 @@ function Home() {
             if (trafficIncreaseParams !== null) {
                 addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase);
             }
-
-            cyRef.current.json({ elements: filteredAnomalousElements });
-        } else {
-            cyRef.current.json({ elements: filteredElements });
         }
 
-        if (!graphCentered && fullGraphInfo.Elements.length > 0) {
+        cyRef.current.json({ elements: filteredElements });
+
+        if (!graphCentered && fullGraphInfo.Elements.length) {
             cyRef.current.center();
             setGraphCentered(true);
         }
@@ -123,24 +113,6 @@ function Home() {
         return () => clearInterval(intervalId);
     }, []);
 
-    function tryFillIpFiltersFromString(filterList, filterString) {
-        if (filterString === '' || filterString === null) {
-            return;
-        }
-
-        const filters = filterString.split(',');
-        for (const filter of filters) {
-            if (filter.includes('/')) {
-                const subnetParts = filter.split('/');
-                const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
-                filterList.push([ipToInteger(subnetParts[0]) & maskInteger, maskInteger])
-            }
-            else {
-                filterList.push([ipToInteger(filter), ipMaskToInteger(32)]);
-            }
-        }
-    }
-
     function onFilterGraph(inclusionString, exclusionString, serviceString) {
 
         var newSubnetInclusions = [];
@@ -159,47 +131,39 @@ function Home() {
 
     function getFilteredGraphElements() {
         return fullGraphInfo.Elements.filter((element) => {
-            if (element.data.source) {
-                if (graphFilterParams.services.length > 0) {
-                    const interactionServices = interactionKeyToData.current[entityPairToDictionaryKey(element.data.source, element.data.target)][3];
-                    if (!graphFilterParams.services.some((filterService) => {
-                        for (const interactionService of interactionServices) {
-                            if (interactionService.toLowerCase() == filterService) {
-                                return true;
-                            }
-                        }
-
-                        return false;
-                    })) {
-                        return false;
-                    }
-                }
-
-                if (shouldIpBeDisplayedOnGraph(element.data.source) && shouldIpBeDisplayedOnGraph(element.data.target)) {
-                    return true;
-                }
-
-                if (graphFilterParams.services.size == 0) {
-                    return false;
-                }
-
-                return false;
+            if (!element.data.source) {
+                return shouldIpBeDisplayedOnGraph(element.data.id);
             }
 
-            return shouldIpBeDisplayedOnGraph(element.data.id);
+            if (graphFilterParams.services.length) {
+                const interactionServices = interactionKeyToData.current[entityPairToDictionaryKey(element.data.source, element.data.target)][3];
+                if (!graphFilterParams.services.some((filterService) => {
+                    for (const interactionService of interactionServices) {
+                        if (interactionService.toLowerCase() == filterService) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                })) {
+                    return false;
+                }
+            }
+
+            return shouldIpBeDisplayedOnGraph(element.data.source) && shouldIpBeDisplayedOnGraph(element.data.target);
         });
     }
 
     function shouldIpBeDisplayedOnGraph(ip) {
 
-        if (graphFilterParams.exclusion.length > 0) {
+        if (graphFilterParams.exclusion.length) {
             const ipInteger = ipToInteger(ip);
             if (graphFilterParams.exclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
                 return false;
             }
         }
 
-        if (graphFilterParams.inclusion.length > 0) {
+        if (graphFilterParams.inclusion.length) {
             const ipInteger = ipToInteger(ip);
             if (!graphFilterParams.inclusion.some((subnet) => isIpInSubnet(ipInteger, subnet[0], subnet[1]))) {
                 return false;
@@ -232,8 +196,10 @@ function Home() {
 
         setEntityToData(entityDictionary);
 
-        const newFullGraphElements = generateGraphElements(networkInfo);
+        const newFullGraphElements = generateGraphElements(networkInfo, entityPairToDictionaryKey);
         interactions.current = networkInfo.Interactions;
+
+        setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
 
         setFullGraphInfo({ Elements: newFullGraphElements, CaptureStartTimestamp: networkInfo.CaptureStartTimestamp, CaptureEndTimestamp: networkInfo.CaptureEndTimestamp });
         interactionKeyToData.current = {};
@@ -253,68 +219,6 @@ function Home() {
 
     const setEntityInfoPanelData = (ip = null, hostname = null, mac = null, os = null, domain = null, services = null) => {
         setEntityInfo({ "ip": ip, "hostname": hostname, "mac": mac, "os": os, "domain": domain, "services": services })
-    }
-
-    // TODO: move to a class
-    function generateGraphElements(networkInfo) {
-
-        let elements = []
-
-        for (const entity of networkInfo.Entities) {
-            if (entity[0] === null || entity[1] === null) {
-                continue;
-            }
-
-            let entityIp = entity[0]
-            let entityData = entity[1];
-            let x = 0;
-            let y = 0;
-
-            if (networkInfo.EntityPositions != null) {
-                let entityPosition = networkInfo.EntityPositions[entityIp]
-
-                // Bug
-                if (entityPosition !== undefined) {
-                    x = entityPosition[0];
-                    y = entityPosition[1];
-                }
-            }
-
-            // Figure icon
-            let icon = null;
-            // TODO: use enums
-            if (entityData.Type === null || entityData.Type === EntityType.Computer) {
-                icon = '/computer.png';
-            }
-            else if (entityData.Type === EntityType.Gateway) {
-                icon = '/gateway.png';
-            }
-            else if (entityData.Type === EntityType.DHCP) {
-                icon = '/dhcp.png';
-            }
-            else if (entityData.Type === EntityType.DNS) {
-                icon = '/dns.png';
-            }
-            else if (entityData.Type === EntityType.Server) {
-                icon = '/server.png';
-            }
-            else {
-                icon = '/iot.png';
-            }
-
-            // Figure label
-            let label = entityData.Hostname ? entityData.Hostname : entityData.Ip;
-
-            elements.push({ 'data': { 'id': entityIp, 'label': label, 'image': icon }, 'position': { x: x, y: y } });
-        }
-
-        for (const interaction of networkInfo.Interactions) {
-            elements.push({ 'data': { 'source': interaction[0][0], 'target': interaction[0][1], 'id': entityPairToDictionaryKey(interaction[0][0], interaction[0][1]) }, 'classes': 'edge' });
-        }
-
-        setCaptureLength(networkInfo.CaptureEndTimestamp - networkInfo.CaptureStartTimestamp);
-
-        return elements;
     }
 
 

@@ -125,6 +125,24 @@ export function parseTime(str) {
     return NaN;
 }
 
+export function tryFillIpFiltersFromString(filterList, filterString) {
+    if (filterString === '' || filterString === null) {
+        return;
+    }
+
+    const filters = filterString.split(',');
+    for (const filter of filters) {
+        if (filter.includes('/')) {
+            const subnetParts = filter.split('/');
+            const maskInteger = ipMaskToInteger(Number(subnetParts[1]));
+            filterList.push([ipToInteger(subnetParts[0]) & maskInteger, maskInteger])
+        }
+        else {
+            filterList.push([ipToInteger(filter), ipMaskToInteger(32)]);
+        }
+    }
+}
+
 function getNumberWithoutFinalCharAndWhitespace(str, finalChar) {
     if (!str.endsWith(finalChar)) {
         return NaN;
