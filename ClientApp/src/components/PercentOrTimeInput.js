@@ -17,7 +17,7 @@ function PercentOrTimeInput(props) {
         const percentage = parsePercentage(input);
         if (!isNaN(percentage)) {
             if (percentage <= 0.0001 || percentage >= 100.0) {
-                onInputChangeInvalid('Valid percentage: 0% < P <= 100%');
+                onInputChangeInvalid('Valid percentage: 0% < P < 100%');
                 return;
             }
 
