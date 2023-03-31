@@ -5,6 +5,6 @@ A web based project that uses ASP.NET backend and React frontend to visualize ne
 - .NET 7
 - NPM
 <br /><br />
-![image](https://user-images.githubusercontent.com/26511261/213912940-beb7acc2-3c6d-4c62-9f18-58c2b2ac6360.png)
+![image](https://user-images.githubusercontent.com/26511261/229103149-bf2d534d-49fc-484e-9e05-7e40059fe6d5.png)
 
 Icons used from https://www.flaticon.com/
