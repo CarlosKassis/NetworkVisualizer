@@ -4,7 +4,7 @@ import CytoscapeWrapper from './CytoscapeWrapper'
 import EntityInfo from './EntityInfo';
 import GraphFilter from './GraphFilter';
 import './Cyber.css'
-import { entityPairToDictionaryKey, ipMaskToInteger, ipToInteger, isIpInSubnet, tryFillIpFiltersFromString } from '../Utils'
+import { entityPairToDictionaryKey, ipToInteger, isIpInSubnet, tryFillIpFiltersFromString } from '../Utils'
 import DropDown from './DropDown';
 import { getNicsApi, stopLiveCaptureApi, startLiveCaptureApi, getLiveCaptureDataApi } from '../NetworkAnalyzerApi.js'
 import NewConnections from './NewConnections';
@@ -44,7 +44,7 @@ function Home() {
     /// Main pipeline for showing graph elements ///
     ////////////////////////////////////////////////
     useEffect(() => {
-        var filteredElements = getFilteredGraphElements();
+        const filteredElements = getFilteredGraphElements();
 
         if (selectedInteraction !== null) {
             setSelectedInteraction(interactionKeyToData.current[entityPairToDictionaryKey(selectedInteraction[0][0], selectedInteraction[0][1])])
@@ -58,9 +58,8 @@ function Home() {
         }
 
         // Decide if to display gathered anomalous edges or all edges
-        const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
         if (newConnectionsBaseline !== null || trafficIncreaseParams !== null) {
-            filteredElements = filteredElements.filter(element => !isEdge(element));
+            const filteredAnomalousElements = filteredElements.filter(element => !isEdge(element));
             if (newConnectionsBaseline !== null) {
                 addAnomalousNewConnectionsEdges(filteredElements, filteredAnomalousElements, interactions.current, newConnectionsBaseline, fullGraphInfo.CaptureStartTimestamp, fullGraphInfo.CaptureEndTimestamp);
             }
@@ -68,9 +67,11 @@ function Home() {
             if (trafficIncreaseParams !== null) {
                 addAnomalousTrafficIncreaseEdges(filteredElements, filteredAnomalousElements, interactions.current, trafficIncreaseParams.Baseline, trafficIncreaseParams.Increase);
             }
+            cyRef.current.json({ elements: filteredAnomalousElements });
+        } else {
+            cyRef.current.json({ elements: filteredElements });
         }
 
-        cyRef.current.json({ elements: filteredElements });
 
         if (!graphCentered && fullGraphInfo.Elements.length) {
             cyRef.current.center();

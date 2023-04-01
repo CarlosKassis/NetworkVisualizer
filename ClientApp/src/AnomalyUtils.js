@@ -31,6 +31,12 @@ function getNewConnectionsElements(baseline, captureStartTime, captureEndTime, i
 
     const newConnections = new Set();
     for (const interaction of interactions.filter(inter1 => inter1[2] >= captureStartTime + baselineTimeInSeconds)) {
+
+        // Patch
+        if (interaction[2] >= captureEndTime) {
+            continue;
+        }
+
         newConnections.add(entityPairToDictionaryKey(interaction[0][0], interaction[0][1]))
     }
 

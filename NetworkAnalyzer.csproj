@@ -17,12 +17,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Cytoscape.js" Version="2.7.10" />
     <PackageReference Include="IPNetwork2" Version="2.6.548" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageReference Include="Pcap.Net.x64" Version="1.0.4.1" />
-    <PackageReference Include="QuikGraph" Version="2.5.0" />
     <PackageReference Include="UAParser" Version="3.1.47" />
   </ItemGroup>
 
